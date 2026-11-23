@@ -1,14 +1,10 @@
 # Terra Andina · Agencia de Viajes
 
-MVP monolítico en Blazor Web App .NET 10 para una agencia de turismo en Bolivia. El catálogo se renderiza en el servidor y los formularios privados usan Interactive Server. ASP.NET Core Identity, EF Core Code First y SQL Server comparten el mismo proyecto `Agencia.Web`.
+MVP monolítico en Blazor Web App .NET 10 para una agencia de turismo en Bolivia. El catálogo se renderiza en el servidor y los formularios privados usan Interactive Server. ASP.NET Core Identity, EF Core Code First y SQLite comparten el mismo proyecto `Agencia.Web`.
 
 ## Ejecutar en Windows
 
-Se necesita el SDK de .NET 10 y acceso a una instancia SQL Server. La configuración inicial usa SQL Server LocalDB `(localdb)\MSSQLLocalDB`. Si usas SQL Server Express, guarda la cadena de tu instancia con User Secrets, por ejemplo:
-
-```powershell
-dotnet user-secrets set 'ConnectionStrings:DefaultConnection' 'Server=.\SQLEXPRESS;Database=AgenciaAndina;Integrated Security=True;TrustServerCertificate=True' --project Agencia.Web.csproj
-```
+Se necesita el SDK de .NET 10. La configuración inicial crea `agencia.sqlite` en la raíz del proyecto durante el primer inicio.
 
 Crea la cuenta que administrará la agencia. Usa un correo que todavía no esté registrado y una contraseña propia que cumpla la política de Identity.
 
@@ -16,15 +12,15 @@ Crea la cuenta que administrará la agencia. Usa un correo que todavía no esté
 dotnet user-secrets set 'Agency:AdminEmail' 'administracion@ejemplo.com' --project Agencia.Web.csproj
 dotnet user-secrets set 'Agency:AdminPassword' '<tu-contraseña-segura>' --project Agencia.Web.csproj
 dotnet dev-certs https --trust
+dotnet run --project Agencia.Web.csproj --launch-profile https
 ```
 
-Abre [https://localhost:7055](https://localhost:7055). Con `Agency:InitializeDatabase=true`, el primer inicio aplica las migraciones y crea los roles y departamentos. La cuenta de conexión debe poder crear o migrar la base de datos. En el perfil de desarrollo, `Agency:DemoCatalog=true` carga tours, fechas relativas al primer inicio, una promoción y un paquete. La cuenta administradora se crea sin una contraseña predeterminada y el arranque no concede privilegios a un usuario registrado anteriormente.
+Abre [https://localhost:7055](https://localhost:7055). Con `Agency:InitializeDatabase=true`, el primer inicio aplica las migraciones y crea los roles y departamentos. En el perfil de desarrollo, `Agency:DemoCatalog=true` carga tours, fechas relativas al primer inicio, una promoción y un paquete. La cuenta administradora se crea sin una contraseña predeterminada y el arranque no concede privilegios a un usuario registrado anteriormente.
 
 Con `Agency:DemoCatalog=true` también puedes crear una cuenta de viajero de prueba (`viajero.demo@example.test`). Configura su contraseña antes de iniciar la aplicación:
 
 ```powershell
 dotnet user-secrets set 'Auth:DemoUserPassword' '<tu-contraseña-de-prueba>' --project Agencia.Web.csproj
-dotnet run --project Agencia.Web.csproj --launch-profile https
 ```
 
 También puedes usar la variable de entorno `Auth__DemoUserPassword`. Si falta, la aplicación registra una advertencia y continúa sin crear esa cuenta. Si el correo ya existe, no cambia su contraseña ni sus permisos. No guardes la contraseña en `appsettings.json`.
@@ -43,19 +39,20 @@ La hoja base permite ejecutar el proyecto también sin npm. Las fotografías de 
 
 El proyecto se despliega como **Web Service** con runtime **Docker**, usando el `Dockerfile` de la raíz. Render termina HTTPS y la aplicación escucha HTTP en el puerto `PORT` (10000 por defecto). Blazor Interactive Server requiere conexiones WebSocket, admitidas por Render.
 
-La base configurada para desarrollo es SQL Server LocalDB de Windows; no funciona dentro del contenedor Linux. Antes de desplegar, prepara un **SQL Server accesible desde Render** y configura estas variables en *Environment* del servicio:
+Para que SQLite conserve los datos entre reinicios y despliegues, usa un **plan de Render con disco persistente** montado en `/var/data`. Configura estas variables en *Environment* del servicio:
 
 | Variable | Valor |
 | --- | --- |
-| `ConnectionStrings__DefaultConnection` | `Server=tcp:<host>,1433;Database=AgenciaAndina;User ID=<usuario>;Password=<contraseña>;Encrypt=True;TrustServerCertificate=False` |
-| `Agency__InitializeDatabase` | `true` para aplicar migraciones al iniciar y crear roles; la cuenta SQL necesita permisos para ello |
+| `ConnectionStrings__DefaultConnection` | `Data Source=/var/data/agencia.sqlite;Default Timeout=30` |
+| `Agency__DataProtectionKeysPath` | `/var/data/keys` para conservar las sesiones |
+| `Agency__InitializeDatabase` | `true` para crear la base, aplicar migraciones y crear roles al iniciar |
 | `Agency__DemoCatalog` | `false` en producción |
 | `Agency__AdminEmail` | Correo de una cuenta administradora nueva |
 | `Agency__AdminPassword` | Contraseña segura para esa cuenta |
 
-Conecta el repositorio en Render, crea un Web Service con Docker y despliega. `Auth__DemoUserPassword` solo se necesita si activas `Agency__DemoCatalog` y quieres la cuenta de viajero demo. La base administrada PostgreSQL de Render no es compatible con las migraciones SQL Server actuales; cambiarla requiere adaptar el proveedor y generar migraciones nuevas.
+Conecta el repositorio en Render, crea un Web Service con Docker, añade el disco y despliega. `Auth__DemoUserPassword` solo se necesita si activas `Agency__DemoCatalog` y quieres la cuenta de viajero demo. Las migraciones SQLite crean una base nueva; los datos de una instalación SQL Server anterior no se copian automáticamente.
 
-El sistema de archivos del servicio es temporal. Para conservar las claves de autenticación entre despliegues, en un plan que admita disco persistente monta uno en `/var/data` y configura `Agency__DataProtectionKeysPath=/var/data/keys`. Sin claves persistentes, las sesiones de los usuarios se invalidan al reiniciar el contenedor.
+El plan gratuito de Render no admite disco persistente: SQLite funcionará para pruebas, pero **perderá todos los datos** al reiniciar, suspender o redesplegar el servicio. En ese plan también se pierden las claves de autenticación y se cierran las sesiones.
 
 ## Flujos de prueba
 
@@ -68,10 +65,10 @@ El sistema de archivos del servicio es temporal. Para conservar las claves de au
 ## Alcance de esta versión
 
 - Catálogo, formularios comerciales y portal de viajeros en español e inglés. Los paneles internos y parte de la configuración avanzada de Identity se presentan en español o mantienen los textos de la plantilla.
-- Las reservas retienen cupos al enviarse. La cancelación libera por transacción los lugares retenidos. Las versiones de fila de SQL Server protegen reservas, salidas y cotizaciones frente a escrituras concurrentes.
+- Las reservas retienen cupos al enviarse. La cancelación libera por transacción los lugares retenidos. Las versiones de fila generadas por la aplicación protegen reservas, salidas y cotizaciones frente a escrituras concurrentes.
 - El servicio de precios aplica el mayor descuento elegible al precio del tour. Los extras tienen precio por reserva. BOB y USD son tarifas explícitas. Los paquetes se comercializan por consulta y los viajes derivados de cotización se registran como salidas privadas.
 - Los pagos de la reserva usan su moneda. Efectivo, transferencia y QR se registran manualmente. La confirmación de tarjeta queda pendiente de integrar un proveedor mediante `IPaymentGateway`. Los reembolsos registran una operación que se realizó externamente.
-- Los recibos se almacenan en SQL Server y se descargan con autorización del propietario o Contabilidad. NIT y razón social se guardan para facturación externa. El proyecto usa configuración externa para secretos.
+- Los recibos se almacenan en SQLite y se descargan con autorización del propietario o Contabilidad. NIT y razón social se guardan para facturación externa. El proyecto usa configuración externa para secretos.
 - La gestión de fichas de catálogo, empleados, proveedores, guías y demás datos maestros usa los módulos CRUD de `AdminService`. Los procesos de reservas, pagos, cotizaciones y operaciones usan servicios específicos.
 
 Para configurar una instalación sin datos de ejemplo, establece `Agency:DemoCatalog=false`. Tras inicializar la base, puedes retirar el secreto de la contraseña inicial. Si la infraestructura aplica las migraciones por separado, desactiva `Agency:InitializeDatabase` después de inicializar roles y departamentos. Usa `ConnectionStrings__DefaultConnection`, `Agency__AdminEmail` y `Agency__AdminPassword` si gestionas la configuración con variables de entorno.

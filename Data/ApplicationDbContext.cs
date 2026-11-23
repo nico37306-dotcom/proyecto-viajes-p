@@ -1,6 +1,7 @@
 using Agencia.Web.Domain;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace Agencia.Web.Data;
 
@@ -28,6 +29,29 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     protected override void ConfigureConventions(ModelConfigurationBuilder configuration)
     {
         configuration.Properties<decimal>().HavePrecision(14, 2);
+        configuration.Properties<DateTimeOffset>().HaveConversion<DateTimeOffsetToBinaryConverter>();
+    }
+
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        RefreshVersions();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        RefreshVersions();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    private void RefreshVersions()
+    {
+        foreach (var entry in ChangeTracker.Entries<Reserva>().Where(e => e.State is EntityState.Added or EntityState.Modified))
+            entry.Entity.Version = Guid.NewGuid().ToByteArray();
+        foreach (var entry in ChangeTracker.Entries<Salida>().Where(e => e.State is EntityState.Added or EntityState.Modified))
+            entry.Entity.Version = Guid.NewGuid().ToByteArray();
+        foreach (var entry in ChangeTracker.Entries<SolicitudCotizacion>().Where(e => e.State is EntityState.Added or EntityState.Modified))
+            entry.Entity.Version = Guid.NewGuid().ToByteArray();
     }
 
     protected override void OnModelCreating(ModelBuilder model)

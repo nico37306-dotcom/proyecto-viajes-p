@@ -57,7 +57,7 @@ public class SolicitudCotizacion : IRegistro
     public EstadoCotizacion Estado { get; set; }
     public Cotizacion? Oferta { get; set; }
     public ViajeGrupal? Viaje { get; set; }
-    [Timestamp] public byte[] Version { get; set; } = [];
+    [ConcurrencyCheck] public byte[] Version { get; set; } = [];
 }
 
 public class Cotizacion : IRegistro

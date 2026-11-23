@@ -4,6 +4,7 @@ using Agencia.Web.Components.Account;
 using Agencia.Web.Data;
 using Agencia.Web.Domain;
 using Agencia.Web.Services;
+using Microsoft.Data.Sqlite;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Components.Authorization;
@@ -41,9 +42,14 @@ builder.Services.AddAuthentication(options =>
 }).AddIdentityCookies();
 builder.Services.ConfigureApplicationCookie(options => options.AccessDeniedPath = "/Account/AccessDenied");
 
-builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")
-        ?? throw new InvalidOperationException("Configura ConnectionStrings:DefaultConnection.")));
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+if (string.IsNullOrWhiteSpace(connectionString))
+    throw new InvalidOperationException(
+        "Configura ConnectionStrings__DefaultConnection con la ruta de una base SQLite.");
+var dataSource = new SqliteConnectionStringBuilder(connectionString).DataSource;
+if (!string.Equals(dataSource, ":memory:", StringComparison.OrdinalIgnoreCase))
+    Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(dataSource))!);
+builder.Services.AddDbContextFactory<ApplicationDbContext>(options => options.UseSqlite(connectionString));
 builder.Services.AddIdentityCore<ApplicationUser>(options =>
 {
     options.SignIn.RequireConfirmedAccount = false;

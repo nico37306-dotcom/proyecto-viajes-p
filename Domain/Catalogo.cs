@@ -112,7 +112,7 @@ public class Salida : IRegistro
     public Vehiculo? Vehiculo { get; set; }
     public bool Privada { get; set; }
     [MaxLength(2500)] public string Checklist { get; set; } = "";
-    [Timestamp] public byte[] Version { get; set; } = [];
+    [ConcurrencyCheck] public byte[] Version { get; set; } = [];
     public int Disponibles => Cupos - Ocupados;
 }
 

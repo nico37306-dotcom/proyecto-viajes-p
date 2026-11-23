@@ -22,7 +22,7 @@ public class Reserva : IRegistro
     public List<Pasajero> Pasajeros { get; set; } = [];
     public List<ReservaServicioAdicional> Extras { get; set; } = [];
     public List<Pago> Pagos { get; set; } = [];
-    [Timestamp] public byte[] Version { get; set; } = [];
+    [ConcurrencyCheck] public byte[] Version { get; set; } = [];
     public decimal Pagado => Pagos.Where(x => x.Estado == EstadoPago.Confirmado).Sum(x => x.Monto);
 }
 

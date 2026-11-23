@@ -76,8 +76,9 @@ public sealed class PaymentService(IDbContextFactory<ApplicationDbContext> facto
     {
         await using var db = await factory.CreateDbContextAsync();
         await using var tx = await db.Database.BeginTransactionAsync();
-        // The update obtains an exclusive lock and increments rowversion, synchronizing with booking transitions.
-        if (await db.Reservas.Where(x => x.Id == id).ExecuteUpdateAsync(s => s.SetProperty(x => x.Total, x => x.Total)) == 0)
+        // The update obtains a write lock and advances the reservation version before recording a payment.
+        var version = Guid.NewGuid().ToByteArray();
+        if (await db.Reservas.Where(x => x.Id == id).ExecuteUpdateAsync(s => s.SetProperty(x => x.Version, version)) == 0)
             throw new ReglaException("Reserva inexistente.");
         var reserva = await db.Reservas.Include(x => x.Pagos).SingleAsync(x => x.Id == id);
         await accion(db, reserva);

@@ -6,5 +6,9 @@ node_modules/
 *.user
 *.mdf
 *.ldf
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
 .env
 Dockerfile*
