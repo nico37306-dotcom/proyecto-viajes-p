@@ -1,0 +1,37 @@
+@inherits LayoutComponentBase
+@inject NavigationManager Nav
+@inject Preferences SitePreferences
+
+<a class="skip" href="#contenido">@T("Saltar al contenido", "Skip to content")</a>
+<header class="site-header">
+    <div class="wrap header-inner">
+        <a class="brand" href="/" aria-label="Terra Andina"><span class="brand-mark" aria-hidden="true"></span><span>Terra<span class="brand-accent"> Andina</span><small>BOLIVIA</small></span></a>
+        <nav class="main-nav" aria-label="@T("Navegación principal", "Primary navigation")">
+            <NavLink href="/tours">@L["Tours"]</NavLink>
+            <NavLink href="/destinos">@L["Destinos"]</NavLink>
+            <NavLink href="/paquetes">@L["Paquetes"]</NavLink>
+            <NavLink href="/organizaciones">@L["Grupos"]</NavLink>
+            <NavLink href="/guia">@L["Guia"]</NavLink>
+        </nav>
+        <div class="header-controls">
+            <a class="preference" href="@PreferenceLink(English ? "idioma=es" : "idioma=en")" data-enhance-nav="false" aria-label="@(English ? "Cambiar a español" : "Switch to English")">@(English ? "ES" : "EN")</a>
+            <a class="preference" href="@PreferenceLink(SitePreferences.Currency == Moneda.BOB ? "moneda=USD" : "moneda=BOB")" data-enhance-nav="false" title="@T("Cambiar moneda", "Change currency")">@SitePreferences.Currency</a>
+            <AuthorizeView>
+                <Authorized><a class="btn btn-outline btn-small" href="/panel">@L["Cuenta"]</a></Authorized>
+                <NotAuthorized><a class="btn btn-outline btn-small" href="/Account/Login">@L["Entrar"]</a></NotAuthorized>
+            </AuthorizeView>
+        </div>
+    </div>
+</header>
+<main id="contenido">@Body</main>
+<footer class="site-footer">
+    <div class="wrap footer-grid">
+        <div><a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span><span>Terra<span class="brand-accent"> Andina</span><small>BOLIVIA</small></span></a><p>@L["Footer"]</p></div>
+        <nav aria-label="@T("Información de viajes", "Travel information")"><a href="/salidas">@L["Salidas"]</a><a href="/promociones">@L["Promos"]</a><a href="/frecuentes">@L["Frecuentes"]</a></nav>
+        <nav aria-label="@T("Agencia", "Agency")"><a href="/convenios">@L["Convenios"]</a><a href="/nosotros">@L["Nosotros"]</a><a href="/preguntas">@L["FAQ"]</a></nav>
+        <nav aria-label="@T("Ayuda", "Help")"><a href="/contacto">@L["Contacto"]</a><a href="/creditos">@T("Créditos fotográficos", "Photo credits")</a></nav>
+    </div>
+</footer>
+@code {
+    private string PreferenceLink(string value) => $"/preferencias?{value}&volver={Uri.EscapeDataString(new Uri(Nav.Uri).PathAndQuery)}";
+}

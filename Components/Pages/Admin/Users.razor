@@ -1,0 +1,80 @@
+@page "/gestion/usuarios"
+@layout PanelLayout
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = Acceso.Admin)]
+@inject AccountService Accounts
+@inject AdminService Admin
+<PageTitle>Usuarios y roles | Terra Andina</PageTitle>
+<h1>Usuarios y roles</h1>
+<div class="actions"><button class="btn" disabled="@busy" @onclick="Nuevo">Nueva cuenta</button></div>
+@if (mensaje is not null) { <p class="notice @(error ? "error" : "")" role="status">@mensaje</p> }
+@if (input is not null)
+{
+    <EditForm class="panel form-stack" Model="input" OnValidSubmit="Guardar">
+        <DataAnnotationsValidator /><ValidationSummary />
+        <fieldset disabled="@busy" class="field-grid">
+            <label>Correo<InputText type="email" disabled="@(id is not null)" @bind-Value="input.Correo" /></label>
+            @if (id is null) { <label>Contraseña inicial<InputText type="password" autocomplete="new-password" required @bind-Value="input.Password" /></label> }
+            <label>Rol<InputSelect @bind-Value="input.Rol">@foreach (var rol in Acceso.Roles) { <option value="@rol">@rol</option> }</InputSelect></label>
+            @if (input.Rol == Acceso.Empleado)
+            { <label>Empleado<InputSelect required @bind-Value="input.Empleado"><option value="">Selecciona un empleado</option>@foreach (var o in empleados) { <option value="@o.Id">@o.Texto</option> }</InputSelect></label> }
+            @if (input.Rol == Acceso.Organizacion)
+            { <label>Organización<InputSelect required @bind-Value="input.Organizacion"><option value="">Selecciona una organización</option>@foreach (var o in organizaciones) { <option value="@o.Id">@o.Texto</option> }</InputSelect></label> }
+            @if (input.Rol is Acceso.Cliente or Acceso.Frecuente)
+            { <label>Cliente<InputSelect required @bind-Value="input.Cliente"><option value="">Selecciona un cliente</option>@foreach (var o in clientes) { <option value="@o.Id">@o.Texto</option> }</InputSelect></label> }
+            <label class="check"><InputCheckbox @bind-Value="input.Activa" />Cuenta activa</label>
+        </fieldset>
+        <div class="actions"><button class="btn" type="submit" disabled="@busy">Guardar</button><button class="btn btn-outline" type="button" disabled="@busy" @onclick="() => input = null">Cerrar</button></div>
+    </EditForm>
+}
+<div class="table-wrap"><table><thead><tr><th>Correo</th><th>Rol</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>
+    @foreach (var c in cuentas)
+    { <tr><td>@c.Correo</td><td>@c.Rol</td><td>@(c.Activa ? "Activa" : "Inactiva")</td><td><button class="btn btn-small btn-outline" disabled="@busy" @onclick="() => Editar(c)">Editar</button></td></tr> }
+</tbody></table></div>
+@code {
+    private List<Cuenta> cuentas = [];
+    private List<Opcion> empleados = [], organizaciones = [], clientes = [];
+    private Entrada? input;
+    private string? mensaje, id;
+    private bool busy, error;
+    protected override async Task OnInitializedAsync()
+    {
+        cuentas = await Accounts.Listar();
+        empleados = await Admin.ReferenciasCuenta(typeof(Empleado));
+        organizaciones = await Admin.ReferenciasCuenta(typeof(Organizacion));
+        clientes = await Admin.ReferenciasCuenta(typeof(Cliente));
+    }
+    private void Nuevo() { id = null; input = new(); mensaje = null; }
+    private void Editar(Cuenta cuenta)
+    {
+        id = cuenta.Id;
+        input = new() { Correo = cuenta.Correo, Rol = cuenta.Rol, Activa = cuenta.Activa, Empleado = cuenta.Empleado,
+            Organizacion = cuenta.Organizacion, Cliente = cuenta.Cliente };
+        mensaje = null;
+    }
+    private async Task Guardar()
+    {
+        if (busy || input is null) return;
+        busy = true;
+        error = false;
+        try
+        {
+            await Accounts.Guardar(id, input.Correo, input.Password, input.Rol, input.Activa, input.Empleado, input.Organizacion, input.Cliente);
+            cuentas = await Accounts.Listar();
+            input = null;
+            mensaje = "Cuenta guardada.";
+        }
+        catch (ReglaException ex) { error = true; mensaje = ex.Message; }
+        finally { busy = false; }
+    }
+    private sealed class Entrada
+    {
+        [Required, EmailAddress, MaxLength(250)] public string Correo { get; set; } = "";
+        [MaxLength(100)] public string Password { get; set; } = "";
+        public string Rol { get; set; } = Acceso.Empleado;
+        public int? Empleado { get; set; }
+        public int? Organizacion { get; set; }
+        public int? Cliente { get; set; }
+        public bool Activa { get; set; } = true;
+    }
+}

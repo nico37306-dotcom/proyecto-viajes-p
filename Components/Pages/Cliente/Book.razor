@@ -1,0 +1,103 @@
+@page "/reservar/{Id:int}"
+@layout PanelLayout
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = Acceso.Viajero)]
+@inject IDepartureService Departures
+@inject IBookingService Bookings
+@inject NavigationManager Nav
+@inject Preferences SitePreferences
+<PageTitle>@T("Solicitar reserva", "Request booking") | Terra Andina</PageTitle>
+<h1>@T("Solicitar reserva", "Request booking")</h1>
+@if (salida is null || limite < 1)
+{
+    <p class="empty">@T("Esta salida no tiene cupos disponibles.", "This departure has no seats available.")</p>
+    <a class="btn" href="/salidas">@L["Salidas"]</a>
+}
+else
+{
+    <p class="lead">@T(salida.Tour.Nombre, salida.Tour.NombreEn) · @salida.Inicio.ToString("D") · @limite @T("cupos", "seats")</p>
+    <EditForm Model="input" OnSubmit="Guardar" class="panel form-stack">
+        <fieldset disabled="@busy">
+            <div class="field-grid">
+                <label>@T("Número de pasajeros", "Number of guests")<input type="number" min="1" max="@limite" value="@pasajeros.Count" @onchange="CambiarCantidad" /></label>
+                <label>@T("Moneda", "Currency")<InputSelect @bind-Value="moneda" @bind-Value:after="LimpiarPrecio">@foreach(var opcion in Enum.GetValues<Moneda>()) { <option value="@opcion">@opcion</option> }</InputSelect></label>
+            </div>
+            @for (var i = 0; i < pasajeros.Count; i++)
+            {
+                var p = pasajeros[i];
+                <fieldset class="person-box" @key="p"><legend>@T("Pasajero", "Guest") @(i + 1)</legend>
+                    <div class="field-grid">
+                        <label>@T("Nombre completo", "Full name")<InputText required maxlength="140" @bind-Value="p.Nombre" /></label>
+                        <label>@T("Documento", "ID document")<InputText maxlength="40" @bind-Value="p.Documento" /></label>
+                        <label>@T("Nacionalidad", "Nationality")<InputText maxlength="80" @bind-Value="p.Nacionalidad" /></label>
+                        <label>@T("Fecha de nacimiento", "Date of birth")<InputDate @bind-Value="p.Nacimiento" /></label>
+                    </div>
+                    <label>@T("Necesidades alimentarias o de accesibilidad", "Dietary or accessibility needs")<InputText maxlength="500" @bind-Value="p.Requerimientos" /></label>
+                </fieldset>
+            }
+            @if (extras.Count > 0)
+            {
+                <h2>@T("Servicios adicionales", "Add-ons")</h2>
+                @foreach (var extra in extras)
+                {
+                    <label class="check"><input type="checkbox" checked="@elegidos.Contains(extra.Id)" @onchange="e => Seleccionar(extra.Id, (bool)e.Value!)" />@T(extra.Nombre, extra.NombreEn) · @Preferences.Money(moneda == Moneda.BOB ? extra.PrecioBob : extra.PrecioUsd, moneda)</label>
+                }
+            }
+            <label>@T("Código promocional", "Promo code")<InputText maxlength="40" @bind-Value="codigo" @bind-Value:after="LimpiarPrecio" /></label>
+            <label>@T("Notas para la agencia", "Notes for the agency")<InputTextArea maxlength="1500" @bind-Value="notas" /></label>
+        </fieldset>
+        @if (total is not null)
+        {
+            <p class="notice">@T("Total estimado", "Estimated total") <strong>@Preferences.Money(total.Total, moneda)</strong> · @T("Descuento", "Discount") @Preferences.Money(total.Descuento, moneda)</p>
+        }
+        @if (error is not null) { <p class="notice error" role="alert">@error</p> }
+        <div class="actions">
+            <button type="button" class="btn btn-outline" disabled="@busy" @onclick="Estimar">@T("Calcular precio", "Estimate price")</button>
+            <button type="submit" class="btn" disabled="@busy">@T("Enviar solicitud", "Submit request")</button>
+        </div>
+    </EditForm>
+}
+@code {
+    [Parameter] public int Id { get; set; }
+    private readonly object input = new();
+    private Guid solicitud = Guid.NewGuid();
+    private Salida? salida;
+    private int limite;
+    private readonly List<Pasajero> pasajeros = [new()];
+    private List<ServicioAdicional> extras = [];
+    private readonly HashSet<int> elegidos = [];
+    private Moneda moneda;
+    private string codigo = "";
+    private string notas = "";
+    private string? error;
+    private TotalReserva? total;
+    private bool busy;
+    protected override async Task OnParametersSetAsync()
+    {
+        moneda = SitePreferences.Currency;
+        salida = await Departures.Salida(Id);
+        limite = salida is null ? 0 : Math.Min(salida.Disponibles, salida.Tour.Maximo);
+        extras = await Bookings.Extras();
+    }
+    private void Seleccionar(int id, bool value) { if (value) elegidos.Add(id); else elegidos.Remove(id); LimpiarPrecio(); }
+    private void LimpiarPrecio() => total = null;
+    private void CambiarCantidad(ChangeEventArgs e)
+    {
+        if (!int.TryParse(e.Value?.ToString(), out var cantidad) || cantidad < 1 || cantidad > limite) return;
+        while (pasajeros.Count < cantidad) pasajeros.Add(new());
+        if (pasajeros.Count > cantidad) pasajeros.RemoveRange(cantidad, pasajeros.Count - cantidad);
+        LimpiarPrecio();
+    }
+    private NuevaReserva Solicitud() => new(solicitud, Id, moneda, pasajeros, elegidos.ToArray(), codigo, notas);
+    private Task Guardar() => Ejecutar(async () => Nav.NavigateTo($"/reservas/{await Bookings.Crear(Solicitud())}"));
+    private Task Estimar() => Ejecutar(async () => total = await Bookings.Estimar(Solicitud()));
+    private async Task Ejecutar(Func<Task> operacion)
+    {
+        if (busy) return;
+        busy = true;
+        error = null;
+        try { await operacion(); }
+        catch (ReglaException ex) { error = ex.Message; }
+        finally { busy = false; }
+    }
+}

@@ -1,0 +1,12 @@
+@layer theme, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities) source(none);
+@source "../Components";
+@theme {
+  --color-salar: #f8f5ee;
+  --color-lago: #006c62;
+  --color-tierra: #172d26;
+  --color-ocre: #d3a456;
+  --font-display: Georgia, serif;
+  --font-sans: Inter, system-ui, sans-serif;
+}

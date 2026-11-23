@@ -1,0 +1,43 @@
+@page "/Account/Register"
+@using Microsoft.AspNetCore.Identity
+@using Agencia.Web.Data
+@inject AccountService Accounts
+@inject SignInManager<ApplicationUser> SignIn
+@inject IdentityRedirectManager Redirect
+<PageTitle>@T("Crear cuenta", "Create account") | Terra Andina</PageTitle>
+<section class="wrap section account">
+    <h1>@T("Crear cuenta", "Create account")</h1>
+    @if (error is not null) { <p class="notice error" role="alert">@error</p> }
+    <EditForm class="panel form-stack" Model="Input" method="post" FormName="register" OnValidSubmit="RegisterAccount">
+        <DataAnnotationsValidator /><ValidationSummary />
+        <label>@T("Nombre completo", "Full name")<InputText autocomplete="name" @bind-Value="Input!.Nombre" /></label>
+        <label>@T("Correo", "Email")<InputText type="email" autocomplete="username" @bind-Value="Input!.Email" /></label>
+        <label>@T("Contraseña", "Password")<InputText type="password" autocomplete="new-password" @bind-Value="Input!.Password" /></label>
+        <label>@T("Confirmar contraseña", "Confirm password")<InputText type="password" autocomplete="new-password" @bind-Value="Input!.Confirm" /></label>
+        <button class="btn" type="submit">@T("Registrarme", "Register")</button>
+    </EditForm>
+    <p><a class="text-link" href="/Account/Login">@T("Ya tengo una cuenta", "I already have an account")</a></p>
+</section>
+@code {
+    [SupplyParameterFromForm] private InputModel? Input { get; set; }
+    [SupplyParameterFromQuery] private string? ReturnUrl { get; set; }
+    private string? error;
+    protected override void OnInitialized() => Input ??= new();
+    private async Task RegisterAccount()
+    {
+        try
+        {
+            var user = await Accounts.Registrar(Input!.Nombre, Input.Email, Input.Password);
+            await SignIn.SignInAsync(user, false);
+            Redirect.RedirectTo(Preferences.LocalPath(ReturnUrl ?? "/panel"));
+        }
+        catch (ReglaException ex) { error = ex.Message; }
+    }
+    private sealed class InputModel
+    {
+        [Required, MaxLength(140)] public string Nombre { get; set; } = "";
+        [Required, EmailAddress, MaxLength(250)] public string Email { get; set; } = "";
+        [Required, StringLength(100, MinimumLength = 6)] public string Password { get; set; } = "";
+        [Compare(nameof(Password))] public string Confirm { get; set; } = "";
+    }
+}

@@ -1,0 +1,50 @@
+@page "/preguntas"
+@page "/convenios"
+@page "/frecuentes"
+@page "/nosotros"
+@page "/creditos"
+@inject NavigationManager Nav
+<PageTitle>@Titulo | Terra Andina</PageTitle>
+<section class="intro"><div class="wrap"><h1>@Titulo</h1></div></section>
+<section class="wrap section">
+    <div class="reading">
+    @switch (Seccion)
+    {
+        case "preguntas":
+            <details open><summary>@T("¿Cómo me preparo para la altura?", "How should I prepare for altitude?")</summary><p>@T("Revisa la altitud de tu destino y deja tiempo para aclimatarte antes de iniciar una ruta exigente. Consulta a un profesional de salud si tienes dudas para tu caso.", "Check the elevation and allow time to acclimatize before demanding routes. Ask a health professional about your individual needs.")</p></details>
+            <details><summary>@T("¿Qué clima debo esperar?", "What weather should I expect?")</summary><p>@T("El clima varía según la región y la temporada. Consulta tu itinerario y lleva capas para las mañanas y noches del Altiplano.", "Weather varies by region and season. Check your itinerary and pack layers for highland mornings and evenings.")</p></details>
+            <details><summary>@T("¿Qué documentos necesito?", "Which documents do I need?")</summary><p>@T("Lleva un documento de identidad vigente y consulta con la agencia los requisitos de tu recorrido antes de salir.", "Bring a valid ID and check specific requirements for your route before departure.")</p></details>
+            <details><summary>@T("¿Cuándo se confirma mi reserva?", "When is my booking confirmed?")</summary><p>@T("Revisamos la solicitud y registramos el pago. Sigue el estado y el saldo desde tu cuenta.", "We review your request and record your payment. Track your status and balance from your account.")</p></details>
+            break;
+        case "convenios":
+            <p>@T("Trabajamos con proveedores y organizaciones para coordinar servicios, salidas privadas y tarifas acordadas por viaje.", "We work with suppliers and organizations to coordinate services, private departures and agreed rates.")</p>
+            <a class="btn" href="/organizaciones">@T("Consultar para mi organización", "Ask about my organization")</a>
+            break;
+        case "frecuentes":
+            <p>@T("Revisa desde tu perfil los beneficios y promociones asignados a tu cuenta de viajero frecuente.", "Open your profile to view offers and benefits assigned to your frequent traveler account.")</p>
+            <a class="btn" href="/mi-perfil">@T("Ver mi perfil", "View my profile")</a>
+            break;
+        case "creditos":
+            <ul>
+                <li><a href="https://commons.wikimedia.org/wiki/File:Sunset_over_the_Salar_de_Uyuni.jpg">Sunset over the Salar de Uyuni</a> · Leonora Enking · <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC BY-SA 2.0</a></li>
+                <li><a href="https://commons.wikimedia.org/wiki/File:Salar_de_Uyuni_lake.jpg">Salar de Uyuni lake</a> · YoshiVic · <a href="https://creativecommons.org/licenses/by/2.0/">CC BY 2.0</a></li>
+                <li><a href="https://commons.wikimedia.org/wiki/File:Flamingos_Laguna_Colorada.jpg">Flamingos Laguna Colorada</a> · Valdiney Pimenta · <a href="https://creativecommons.org/licenses/by/2.0/">CC BY 2.0</a></li>
+                <li><a href="https://commons.wikimedia.org/wiki/File:Terraced_fields_and_homes_on_Isla_Del_Sol,_Lake_Titicaca.jpg">Terraced fields and homes on Isla del Sol</a> · Bob Ramsak · <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a></li>
+            </ul>
+            <p>@T("Las imágenes se ajustan al espacio de cada tarjeta y portada.", "Photographs are cropped to fit each card and cover.")</p>
+            break;
+        default:
+            <p>@T("Terra Andina reúne itinerarios, fechas y opciones de viaje para conocer Bolivia. Puedes reservar una salida programada o solicitar una ruta para tu grupo.", "Terra Andina brings together itineraries, dates and ways to explore Bolivia. Book a scheduled departure or request a route for your group.")</p>
+            <a class="btn" href="/tours">@L["Explorar"]</a>
+            break;
+    }
+    </div>
+</section>
+@code {
+    private string Seccion => Nav.ToBaseRelativePath(Nav.Uri).Split('?')[0];
+    private string Titulo => Seccion switch
+    {
+        "preguntas" => L["FAQ"], "convenios" => L["Convenios"], "frecuentes" => L["Frecuentes"],
+        "creditos" => T("Créditos fotográficos", "Photo credits"), _ => L["Nosotros"]
+    };
+}

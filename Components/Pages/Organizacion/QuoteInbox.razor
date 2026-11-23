@@ -1,0 +1,11 @@
+@page "/gestion/cotizaciones"
+@layout PanelLayout
+@attribute [Authorize(Policy = Acceso.Alianzas)]
+@inject IQuotationService Service
+<PageTitle>Cotizaciones de grupos | Terra Andina</PageTitle>
+<h1>Cotizaciones de grupos</h1>
+<QuoteList Solicitudes="solicitudes" Ruta="/gestion/cotizaciones" />
+@code {
+    private List<SolicitudCotizacion> solicitudes = [];
+    protected override async Task OnInitializedAsync() => solicitudes = await Service.Bandeja();
+}

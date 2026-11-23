@@ -1,0 +1,32 @@
+@page "/destinos"
+@attribute [StreamRendering]
+@inject IDestinationService Service
+
+<PageTitle>@L["Destinos"] | Terra Andina</PageTitle>
+<section class="intro"><div class="wrap"><h1>@T("Destinos de Bolivia", "Destinations in Bolivia")</h1><p>@T("Explora el país por paisaje, clima y temporada.", "Explore the country by landscape, climate and season.")</p></div></section>
+<div class="wrap section">
+    @if (destinos is null) { <p role="status">@T("Cargando destinos…", "Loading destinations…")</p> }
+    else if (destinos.Count == 0) { <p class="empty">@T("Aún no hay destinos.", "Destinations are coming soon.")</p> }
+    else
+    {
+        <div class="card-grid">
+            @foreach (var d in destinos)
+            {
+                <article class="tour-card">
+                    <div class="tour-image"><img src="@d.Imagen" alt="@T(d.Nombre, d.NombreEn)" loading="lazy" /><span class="image-label">@d.Altitud m</span></div>
+                    <div class="tour-body">
+                        <span class="eyebrow">@T(d.Region.Nombre, d.Region.NombreEn)</span>
+                        <h2>@T(d.Nombre, d.NombreEn)</h2><p>@T(d.Descripcion, d.DescripcionEn)</p>
+                        <p><strong>@T("Mejor época", "Best season")</strong><br />@T(d.MejorEpoca, d.MejorEpocaEn)</p>
+                        <p>@T(d.Recomendaciones, d.RecomendacionesEn)</p>
+                        <a class="text-link" href="/tours?destino=@d.Id">@T("Ver tours en este destino", "Find tours in this destination")</a>
+                    </div>
+                </article>
+            }
+        </div>
+    }
+</div>
+@code {
+    private List<Destino>? destinos;
+    protected override async Task OnInitializedAsync() => destinos = await Service.Destinos();
+}

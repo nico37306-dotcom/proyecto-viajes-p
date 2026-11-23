@@ -1,0 +1,45 @@
+@page "/"
+@attribute [StreamRendering]
+@using Agencia.Web.Data
+@inject ITourService Tours
+
+<PageTitle>Terra Andina | @L["Footer"]</PageTitle>
+<HeadContent><meta name="description" content="@L["HeroText"]" /></HeadContent>
+<section class="hero" style="@($"--hero: url('{Seed.Hero}')")">
+    <div class="wrap hero-content">
+        <p class="eyebrow hero-eyebrow"><span></span>@T("VIAJES POR BOLIVIA", "TRAVEL ACROSS BOLIVIA")</p>
+        <h1>@L["Hero1"]<br /><em>@L["Hero2"]</em></h1>
+        <p class="hero-lead">@L["HeroText"]</p>
+        <div class="actions flex flex-wrap items-center gap-3">
+            <a class="btn btn-ocre" href="/tours">@L["Explorar"]</a>
+            <a class="btn btn-glass" href="/salidas">@L["Salidas"]</a>
+        </div>
+    </div>
+    <span class="hero-location"><span class="pin" aria-hidden="true"></span> Salar de Uyuni · Potosí</span>
+</section>
+<section class="wrap search-wrap" aria-label="@T("Buscar tours", "Find tours")">
+    <form method="get" action="/tours" class="search-bar">
+        <label>@T("¿Adónde quieres ir?", "Where would you like to go?")<input name="buscar" maxlength="100" placeholder="@T("Uyuni, Titicaca, Altiplano…", "Uyuni, Titicaca, Highlands…")" /></label>
+        <label>@T("Fecha de salida", "Departure date")<input type="date" name="fecha" min="@Hoy.ToString("yyyy-MM-dd")" /></label>
+        <button class="btn" type="submit">@T("Buscar tours", "Find tours")</button>
+    </form>
+</section>
+<section class="wrap section featured">
+    <div class="section-head">
+        <div><h2>@L["Featured"]</h2><p>@L["FeaturedText"]</p></div>
+        <a class="btn btn-outline" href="/tours">@L["AllTours"]</a>
+    </div>
+    @if (destacados is null) { <p role="status">@T("Cargando tours…", "Loading tours…")</p> }
+    else if (destacados.Count == 0) { <p>@T("Próximamente publicaremos nuevas experiencias.", "New experiences are coming soon.")</p> }
+    else { <div class="card-grid">@foreach (var tour in destacados.Take(3)) { <TourCard Tour="tour" /> }</div> }
+</section>
+<section class="group-band">
+    <div class="wrap section section-head">
+        <div><h2>@T("Bolivia en grupo", "Bolivia together")</h2><p>@T("Organiza una ruta para tu equipo, universidad o colegio.", "Plan a route for your team, university or school.")</p></div>
+        <a class="btn btn-ocre" href="/organizaciones">@T("Solicitar cotización", "Request a quote")</a>
+    </div>
+</section>
+@code {
+    private List<Tour>? destacados;
+    protected override async Task OnInitializedAsync() => destacados = await Tours.Buscar(new(), destacados: true);
+}

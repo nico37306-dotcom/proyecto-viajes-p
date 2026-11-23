@@ -1,0 +1,49 @@
+@page "/mi-perfil"
+@layout PanelLayout
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = Acceso.Viajero)]
+@inject IClientService Service
+<PageTitle>@T("Mi perfil", "My profile") | Terra Andina</PageTitle>
+<h1>@T("Mi perfil", "My profile")</h1>
+@if (perfil is null) { <p><a class="btn" href="/mi-organizacion">@T("Ir al portal de organizaciones", "Open organization portal")</a></p> }
+else
+{
+    <EditForm Model="perfil.Cliente" class="panel form-stack" OnValidSubmit="Guardar">
+        <DataAnnotationsValidator /><ValidationSummary />
+        <fieldset disabled="@busy" class="field-grid">
+            <label>@T("Nombre", "Name")<InputText @bind-Value="perfil.Cliente.Nombre" /></label>
+            <label>@T("Documento", "ID document")<InputText @bind-Value="perfil.Cliente.Documento" /></label>
+            <label>@T("Nacionalidad", "Nationality")<InputText @bind-Value="perfil.Cliente.Nacionalidad" /></label>
+            <label>@T("Teléfono", "Phone")<InputText type="tel" @bind-Value="perfil.Cliente.Telefono" /></label>
+            <label>NIT<InputText @bind-Value="perfil.Cliente.Nit" /></label>
+            <label>@T("Razón social", "Billing name")<InputText @bind-Value="perfil.Cliente.RazonSocial" /></label>
+            <label>@T("Idioma preferido", "Preferred language")<InputSelect @bind-Value="perfil.Cliente.Idioma"><option value="es">Español</option><option value="en">English</option></InputSelect></label>
+            <label>@T("Preferencias", "Preferences")<InputTextArea @bind-Value="perfil.Cliente.Preferencias" /></label>
+        </fieldset>
+        <button class="btn" type="submit" disabled="@busy">@T("Guardar perfil", "Save profile")</button>
+        @if (mensaje is not null) { <p class="notice @(error ? "error" : "")" role="status">@mensaje</p> }
+    </EditForm>
+    @if (perfil.Cliente.Frecuente || perfil.Beneficios.Count > 0)
+    {
+        <section class="panel itinerary"><h2>@T("Mis beneficios", "My benefits")</h2>
+            @foreach (var b in perfil.Beneficios) { <p>@b.Descripcion · @(b.Utilizado ? T("Utilizado","Used") : b.Vence is DateOnly vence ? $"{T("Hasta","Until")} {vence:d}" : T("Disponible","Available"))</p> }
+            @foreach (var p in perfil.Promociones) { <p>@T(p.Nombre,p.NombreEn) · @(p.Porcentaje ? $"{p.Valor:G29}%" : Preferences.Money(p.Valor,p.Moneda)) @if(p.Codigo is not null) { <code>@p.Codigo</code> }</p> }
+            @if (perfil.Beneficios.Count == 0 && perfil.Promociones.Count == 0) { <p>@T("Aún no hay beneficios asignados.", "No benefits have been assigned yet.")</p> }
+        </section>
+    }
+}
+@code {
+    private Perfil? perfil;
+    private bool busy, error;
+    private string? mensaje;
+    protected override async Task OnInitializedAsync() => perfil = await Service.Obtener();
+    private async Task Guardar()
+    {
+        if (busy || perfil is null) return;
+        busy = true;
+        error = false;
+        try { await Service.Guardar(perfil.Cliente); mensaje = T("Perfil guardado.", "Profile saved."); }
+        catch (ReglaException ex) { error = true; mensaje = ex.Message; }
+        finally { busy = false; }
+    }
+}

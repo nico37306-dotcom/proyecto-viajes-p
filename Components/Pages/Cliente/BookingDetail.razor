@@ -1,0 +1,148 @@
+@page "/reservas/{Id:int}"
+@layout PanelLayout
+@rendermode InteractiveServer
+@attribute [Authorize]
+@inject NavigationManager Nav
+@inject IBookingService Bookings
+@inject IPaymentService Payments
+@inject IClientService Profiles
+@inject ICurrentUserService Current
+<PageTitle>@T("Reserva", "Booking") #@Id | Terra Andina</PageTitle>
+<h1>@T("Reserva", "Booking") #@Id</h1>
+@if (reserva is null) { <p class="empty">@T("Reserva no disponible.", "This booking is unavailable.")</p> }
+else
+{
+    <p class="lead">@T(reserva.Salida.Tour.Nombre, reserva.Salida.Tour.NombreEn) · @reserva.Salida.Inicio.ToString("D") · <span class="status">@LocalEnum.Show(reserva.Estado)</span></p>
+    <div class="module-grid totals">
+        <div class="panel">@T("Total", "Total") <strong>@Preferences.Money(reserva.Total, reserva.Moneda)</strong></div>
+        <div class="panel">@T("Pagado", "Paid") <strong>@Preferences.Money(reserva.Pagado, reserva.Moneda)</strong></div>
+        <div class="panel">@T("Saldo", "Balance") <strong>@Preferences.Money(reserva.Total-reserva.Pagado, reserva.Moneda)</strong></div>
+    </div>
+    @if (mensaje is not null) { <p class="notice @(error ? "error" : "")" role="status">@mensaje</p> }
+    <section class="panel itinerary">
+        <h2>@T("Pasajeros", "Guests")</h2>
+        <ul>@foreach (var p in reserva.Pasajeros) { <li>@p.Nombre @if (Ventas) { <span> · @p.Documento · @p.Nacionalidad · @p.Requerimientos</span> }</li> }</ul>
+        @if (!string.IsNullOrEmpty(reserva.Notas)) { <p class="preserve">@reserva.Notas</p> }
+        @foreach(var extra in reserva.Extras) { <p>@extra.Nombre · @Preferences.Money(extra.Precio,reserva.Moneda)</p> }
+        @if (reserva.Descuento > 0) { <p>@T("Descuento aplicado", "Discount applied") · @Preferences.Money(reserva.Descuento,reserva.Moneda)</p> }
+        @if (Ventas)
+        {
+            <div class="actions">
+                @foreach (var siguiente in BookingService.Siguientes(reserva.Estado))
+                { <button type="button" class="btn btn-outline" disabled="@busy" @onclick="() => Cambiar(siguiente)">@LocalEnum.Show(siguiente)</button> }
+            </div>
+        }
+        else if (Viajero && reserva.Estado is EstadoReserva.Pendiente or EstadoReserva.EnRevision)
+        {
+            @if (!confirmar) { <button class="btn btn-outline" disabled="@busy" @onclick="() => confirmar = true">@T("Cancelar solicitud", "Cancel request")</button> }
+            else { <button class="btn danger" disabled="@busy" @onclick="() => Cambiar(EstadoReserva.Cancelada)">@T("Confirmar cancelación", "Confirm cancellation")</button> }
+        }
+    </section>
+    <section class="panel itinerary">
+        <h2>@T("Pagos registrados", "Recorded payments")</h2>
+        @if (reserva.Pagos.Count == 0) { <p class="muted">@T("Aún no se registraron pagos.", "No payments have been recorded.")</p> }
+        @foreach (var pago in reserva.Pagos)
+        {
+            <div class="departure"><strong>@Preferences.Money(pago.Monto, pago.Moneda) · @LocalEnum.Show(pago.Metodo)</strong>
+                <span>@pago.Fecha.ToOffset(TimeSpan.FromHours(-4)).ToString("d") · @pago.Referencia · @LocalEnum.Show(pago.Estado)</span>
+                @if (!string.IsNullOrWhiteSpace(pago.Comprobante)) { <span>@T("Comprobante", "Receipt") · @pago.Comprobante</span> }
+                @if (pago.TieneArchivo)
+                { <a class="text-link" href="/reservas/@Id/comprobantes/@pago.Id" data-enhance-nav="false">@T("Descargar comprobante", "Download receipt")</a> }
+                @if (Contabilidad && pago.Estado == EstadoPago.Pendiente)
+                {
+                    <div class="actions"><button class="btn btn-small" disabled="@busy" @onclick="() => CambiarPago(pago.Id, EstadoPago.Confirmado)">Confirmar pago</button>
+                        <button class="btn btn-small btn-outline" disabled="@busy" @onclick="() => CambiarPago(pago.Id, EstadoPago.Fallido)">Marcar fallido</button></div>
+                }
+                @if (Contabilidad && pago.Estado == EstadoPago.Confirmado && reserva.Estado == EstadoReserva.Cancelada)
+                { <button class="btn btn-small btn-outline" disabled="@busy" @onclick="() => CambiarPago(pago.Id, EstadoPago.Reembolsado)">Registrar reembolso</button> }
+            </div>
+        }
+        @if (Contabilidad && reserva.Estado is EstadoReserva.Aprobada or EstadoReserva.PendienteDePago or EstadoReserva.Confirmada)
+        {
+            <EditForm Model="modelo" class="form-stack" OnSubmit="AgregarPago">
+                <fieldset disabled="@busy" class="field-grid">
+                    <label>Monto (@reserva.Moneda)<InputNumber min="0.01" step="0.01" @bind-Value="modelo.Monto" /></label>
+                    <label>Método<InputSelect @bind-Value="modelo.Metodo">@foreach (var metodo in Enum.GetValues<MetodoPago>()) { <option value="@metodo">@LocalEnum.Show(metodo)</option> }</InputSelect></label>
+                    <label>Referencia<InputText required maxlength="120" @bind-Value="modelo.Referencia" /></label>
+                    <label>Nota del comprobante<InputText maxlength="500" @bind-Value="modelo.Comprobante" /></label>
+                    <label>Comprobante PDF, JPG o PNG (hasta 2 MB)<InputFile accept=".pdf,.jpg,.jpeg,.png" OnChange="Seleccionar" @key="archivoKey" /></label>
+                </fieldset>
+                <button class="btn" type="submit" disabled="@busy">Registrar pago pendiente</button>
+            </EditForm>
+        }
+    </section>
+    @if (Viajero && reserva.Estado == EstadoReserva.Finalizada && !resenaEnviada)
+    {
+        <EditForm Model="modelo" OnSubmit="Comentar" class="panel form-stack">
+            <h2>@T("Comparte tu experiencia", "Share your experience")</h2>
+            <label>@T("Puntuación (1 a 5)", "Rating (1 to 5)")<InputNumber min="1" max="5" @bind-Value="modelo.Puntuacion" /></label>
+            <label>@T("Comentario", "Review")<InputTextArea maxlength="1500" required @bind-Value="modelo.Resena" /></label>
+            <button class="btn" type="submit" disabled="@busy">@T("Enviar reseña", "Send review")</button>
+        </EditForm>
+    }
+}
+@code {
+    [Parameter] public int Id { get; set; }
+    private Reserva? reserva;
+    private Actor? actor;
+    private bool Ventas => actor?.Tiene(Acceso.Ventas) == true;
+    private bool Contabilidad => actor?.Tiene(Acceso.Contabilidad) == true;
+    private bool Viajero => actor?.Tiene(Acceso.Viajero) == true;
+    private bool busy, error, confirmar, resenaEnviada;
+    private string? mensaje;
+    private readonly Entrada modelo = new();
+    private IBrowserFile? archivo;
+    private int archivoKey;
+    protected override async Task OnParametersSetAsync()
+    {
+        actor = await Current.Actual();
+        if (!Ventas && !Contabilidad && !Viajero) { Nav.NavigateTo("/Account/AccessDenied"); return; }
+        await Cargar();
+    }
+    private async Task Cargar() => reserva = await Bookings.Obtener(Id);
+    private Task Cambiar(EstadoReserva estado) => Ejecutar(() => Bookings.CambiarEstado(Id, estado), T("Estado actualizado.", "Booking updated."));
+    private Task CambiarPago(int id, EstadoPago estado) => Ejecutar(() => Payments.CambiarEstado(Id, id, estado), "Pago actualizado.");
+    private Task AgregarPago() => Ejecutar(async () =>
+    {
+        ReceiptUpload? comprobante = null;
+        if (archivo is not null)
+        {
+            if (archivo.Size > ReceiptUpload.Limite) throw new ReglaException("El comprobante debe tener como máximo 2 MB.");
+            await using var stream = archivo.OpenReadStream(ReceiptUpload.Limite);
+            using var buffer = new MemoryStream();
+            await stream.CopyToAsync(buffer);
+            comprobante = new(archivo.Name, buffer.ToArray());
+        }
+        await Payments.Registrar(Id, modelo.Monto, modelo.Metodo, modelo.Referencia, modelo.Comprobante, comprobante);
+        archivo = null;
+        archivoKey++;
+        modelo.Referencia = modelo.Comprobante = "";
+        modelo.Monto = 0;
+    }, "Pago registrado.");
+    private void Seleccionar(InputFileChangeEventArgs e) => archivo = e.File;
+    private Task Comentar() => Ejecutar(async () =>
+    {
+        await Profiles.Comentar(Id, modelo.Puntuacion, modelo.Resena);
+        resenaEnviada = true;
+    }, T("Reseña recibida.", "Review received."));
+    private async Task Ejecutar(Func<Task> accion, string exito)
+    {
+        if (busy) return;
+        busy = true;
+        mensaje = null;
+        error = false;
+        try { await accion(); mensaje = exito; confirmar = false; await Cargar(); }
+        catch (ReglaException ex) { error = true; mensaje = ex.Message; }
+        catch (UnauthorizedAccessException) { Nav.NavigateTo("/Account/AccessDenied"); }
+        finally { busy = false; }
+    }
+    private sealed class Entrada
+    {
+        public decimal Monto { get; set; }
+        public MetodoPago Metodo { get; set; }
+        public string Referencia { get; set; } = "";
+        public string Comprobante { get; set; } = "";
+        public int Puntuacion { get; set; } = 5;
+        public string Resena { get; set; } = "";
+    }
+}

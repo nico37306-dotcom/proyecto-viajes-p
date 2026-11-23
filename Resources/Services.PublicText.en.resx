@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <data name="Tours" xml:space="preserve"><value>Tours</value></data>
+  <data name="Destinos" xml:space="preserve"><value>Destinations</value></data>
+  <data name="Paquetes" xml:space="preserve"><value>Packages</value></data>
+  <data name="Grupos" xml:space="preserve"><value>Group travel</value></data>
+  <data name="Guia" xml:space="preserve"><value>Travel guide</value></data>
+  <data name="Contacto" xml:space="preserve"><value>Contact</value></data>
+  <data name="Entrar" xml:space="preserve"><value>Sign in</value></data>
+  <data name="Cuenta" xml:space="preserve"><value>My account</value></data>
+  <data name="Explorar" xml:space="preserve"><value>Explore tours</value></data>
+  <data name="Salidas" xml:space="preserve"><value>Scheduled departures</value></data>
+  <data name="Promos" xml:space="preserve"><value>Offers</value></data>
+  <data name="Convenios" xml:space="preserve"><value>Partnerships</value></data>
+  <data name="Frecuentes" xml:space="preserve"><value>Frequent travelers</value></data>
+  <data name="Nosotros" xml:space="preserve"><value>About us</value></data>
+  <data name="FAQ" xml:space="preserve"><value>Frequently asked questions</value></data>
+  <data name="Hero1" xml:space="preserve"><value>Experience the spirit</value></data>
+  <data name="Hero2" xml:space="preserve"><value>of Bolivia.</value></data>
+  <data name="HeroText" xml:space="preserve"><value>From Uyuni’s endless reflections to the islands of Titicaca. Find your next route and travel at your own pace.</value></data>
+  <data name="Featured" xml:space="preserve"><value>Featured experiences</value></data>
+  <data name="FeaturedText" xml:space="preserve"><value>Explore salt flats, highland lagoons and routes rich in history.</value></data>
+  <data name="AllTours" xml:space="preserve"><value>View all tours</value></data>
+  <data name="From" xml:space="preserve"><value>From</value></data>
+  <data name="Day" xml:space="preserve"><value>day</value></data>
+  <data name="Days" xml:space="preserve"><value>days</value></data>
+  <data name="Details" xml:space="preserve"><value>View itinerary</value></data>
+  <data name="Footer" xml:space="preserve"><value>Travel and experiences in Bolivia</value></data>
+</root>

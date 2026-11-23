@@ -1,0 +1,30 @@
+@page "/panel"
+@layout PanelLayout
+@attribute [Authorize]
+@inject ICurrentUserService Current
+<PageTitle>@L["Cuenta"] | Terra Andina</PageTitle>
+<h1>@(actor?.EsAdmin == true ? "Administración" : actor?.Departamento is { } dept ? Acceso.Departamentos.FirstOrDefault(x => x.Clave == dept).Nombre ?? "Panel operativo" : T("Tu espacio de viaje", "Your travel account"))</h1>
+@if (actor?.Tiene(Acceso.Operativo) == true)
+{
+    <div class="module-grid">
+        @if (actor.Tiene(Acceso.Ventas)) { <a class="module" href="/gestion/reservas">Reservas de clientes</a> }
+        @if (actor.Tiene(Acceso.Contabilidad)) { <a class="module" href="/gestion/pagos">Registro de pagos</a> }
+        @if (actor.Tiene(Acceso.Operaciones) || actor.Tiene(Acceso.Guias) || actor.Tiene(Acceso.Transporte)) { <a class="module" href="/gestion/operaciones">Salidas y logística</a> }
+        @if (actor.Tiene(Acceso.Alianzas)) { <a class="module" href="/gestion/cotizaciones">Cotizaciones y viajes grupales</a> }
+        @if (actor.EsAdmin) { <a class="module" href="/gestion/usuarios">Usuarios y roles</a> }
+        @foreach (var modulo in AdminService.Modulos.Where(m => m.Permisos.Any(actor.Tiene))) { <a class="module" href="/gestion/catalogo/@modulo.Clave">@modulo.Titulo</a> }
+    </div>
+}
+else if (actor?.Tiene(Acceso.Viajero) == true)
+{
+    <div class="module-grid"><a class="module" href="/mis-reservas">@T("Reservas y pagos", "Bookings and payments")</a>
+        @if (actor.Tiene(Acceso.Representante)) { <a class="module" href="/mi-organizacion">@T("Convenios y cotizaciones", "Contracts and quotes")</a> }
+        else { <a class="module" href="/mi-perfil">@T("Perfil y beneficios", "Profile and benefits")</a> }
+        <a class="module" href="/tours">@L["Explorar"]</a>
+    </div>
+}
+else { <p class="empty">@T("Tu cuenta no tiene un perfil con acceso al panel.", "Your account does not have dashboard access.")</p> }
+@code {
+    private Actor? actor;
+    protected override async Task OnInitializedAsync() => actor = await Current.Actual();
+}

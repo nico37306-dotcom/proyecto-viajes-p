@@ -1,0 +1,24 @@
+@page "/salidas"
+@attribute [StreamRendering]
+@inject IDepartureService Service
+@inject Preferences SitePreferences
+<PageTitle>@L["Salidas"] | Terra Andina</PageTitle>
+<section class="intro"><div class="wrap"><h1>@L["Salidas"]</h1><p>@T("Consulta fechas, tarifas y cupos por salida.", "Check dates, prices and available seats.")</p></div></section>
+<section class="wrap section stack">
+    @if (salidas is null) { <p role="status">@T("Cargando salidas…", "Loading departures…")</p> }
+    else if (salidas.Count == 0) { <p class="empty">@T("Aún no hay salidas publicadas.", "New departures are coming soon.")</p> }
+    else
+    {
+        @foreach (var s in salidas)
+        {
+            <div class="panel section-head departure-line">
+                <div><strong>@s.Inicio.ToString("D")</strong><h2><a href="/tours/@s.TourId">@T(s.Tour.Nombre, s.Tour.NombreEn)</a></h2><p>@s.Disponibles @T("cupos disponibles", "seats available") · @Preferences.Money(SitePreferences.Currency == Moneda.BOB ? s.PrecioBob ?? s.Tour.PrecioBob : s.PrecioUsd ?? s.Tour.PrecioUsd, SitePreferences.Currency)</p></div>
+                @if (s.Disponibles > 0 && s.Estado != EstadoSalida.Completa) { <a class="btn" href="/reservar/@s.Id">@T("Reservar", "Book")</a> }
+            </div>
+        }
+    }
+</section>
+@code {
+    private List<Salida>? salidas;
+    protected override async Task OnInitializedAsync() => salidas = await Service.Salidas();
+}

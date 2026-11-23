@@ -1,0 +1,23 @@
+@inject Preferences SitePreferences
+<article class="tour-card">
+    <div class="tour-image">
+        @if (!string.IsNullOrWhiteSpace(Tour.Imagen))
+        {
+            <img src="@Tour.Imagen" alt="@T(Tour.Nombre, Tour.NombreEn)" loading="lazy" />
+        }
+        <span class="image-label">@T(Tour.Tipo switch { TipoTour.Naturaleza => "Naturaleza", TipoTour.Aventura => "Aventura", TipoTour.Cultural => "Cultural", TipoTour.Gastronomico => "Gastronómico", _ => "Comunitario" }, Tour.Tipo switch { TipoTour.Naturaleza => "Nature", TipoTour.Aventura => "Adventure", TipoTour.Cultural => "Culture", TipoTour.Gastronomico => "Food", _ => "Community" })</span>
+    </div>
+    <div class="tour-body">
+        <div class="tour-meta">
+            <span>@(Tour.Destinos.FirstOrDefault()?.Destino.Region is { } r ? T(r.Nombre, r.NombreEn) : "Bolivia")</span>
+            <span>@Tour.Dias @(Tour.Dias == 1 ? L["Day"] : L["Days"])</span>
+        </div>
+        <h3><a href="/tours/@Tour.Id">@T(Tour.Nombre, Tour.NombreEn)</a></h3>
+        <p>@T(Tour.Descripcion, Tour.DescripcionEn)</p>
+        <div class="tour-bottom">
+            <span><small>@L["From"]</small><strong>@Preferences.Money(SitePreferences.Currency == Moneda.BOB ? Tour.PrecioBob : Tour.PrecioUsd, SitePreferences.Currency)</strong></span>
+            <a class="text-link" href="/tours/@Tour.Id">@L["Details"]</a>
+        </div>
+    </div>
+</article>
+@code { [Parameter, EditorRequired] public Tour Tour { get; set; } = null!; }

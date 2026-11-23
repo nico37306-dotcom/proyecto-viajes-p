@@ -1,0 +1,32 @@
+@page "/gestion/clientes/{Id:int}"
+@layout PanelLayout
+@attribute [Authorize(Policy = Acceso.Admin)]
+@inject IClientService Service
+@inject NavigationManager Nav
+<PageTitle>Historial del cliente | Terra Andina</PageTitle>
+@if (ficha is not null)
+{
+    <h1>@ficha.Cliente.Nombre</h1>
+    <p class="lead">@(ficha.Cliente.Frecuente ? "Cliente frecuente" : "Cliente regular") · @ficha.Cliente.Telefono</p>
+    <div class="panel itinerary"><h2>Historial de viajes</h2>
+        @if (ficha.Reservas.Count == 0) { <p>Sin reservas.</p> }
+        @foreach (var r in ficha.Reservas)
+        { <p><a class="text-link" href="/reservas/@r.Id">#@r.Id · @r.Salida.Tour.Nombre</a> · @r.Salida.Inicio.ToString("d") · @LocalEnum.Show(r.Estado)</p> }
+    </div>
+    <div class="panel itinerary"><h2>Beneficios</h2>
+        @foreach (var b in ficha.Beneficios) { <p>@b.Descripcion · @(b.Utilizado ? "Utilizado" : "Disponible")</p> }
+        <a href="/gestion/catalogo/beneficios">Gestionar beneficios</a>
+    </div>
+    <div class="panel"><h2>Reseñas</h2>
+        @foreach (var r in ficha.Resenas) { <p>@r.Puntuacion/5 · @r.Comentario</p> }
+    </div>
+}
+@code {
+    [Parameter] public int Id { get; set; }
+    private FichaCliente? ficha;
+    protected override async Task OnParametersSetAsync()
+    {
+        ficha = await Service.Ficha(Id);
+        if (ficha is null) Nav.NotFound();
+    }
+}

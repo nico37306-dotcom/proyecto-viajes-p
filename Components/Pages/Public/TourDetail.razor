@@ -1,0 +1,69 @@
+@page "/tours/{Id:int}"
+@inject ITourService Tours
+@inject IDepartureService Departures
+@inject Preferences SitePreferences
+@inject NavigationManager Navigation
+
+@if (tour is null)
+{
+    <section class="wrap section"><h1>@T("Tour no disponible", "Tour unavailable")</h1><a href="/tours">@L["AllTours"]</a></section>
+}
+else
+{
+    <PageTitle>@T(tour.Nombre, tour.NombreEn) | Terra Andina</PageTitle>
+    <HeadContent><meta name="description" content="@T(tour.Descripcion, tour.DescripcionEn)" /></HeadContent>
+    <section class="intro"><div class="wrap"><a href="/tours">@L["Tours"]</a><h1>@T(tour.Nombre, tour.NombreEn)</h1><p>@T(tour.Descripcion, tour.DescripcionEn)</p></div></section>
+    <div class="wrap section detail-layout">
+        <article>
+            @if (!string.IsNullOrWhiteSpace(tour.Imagen)) { <img class="detail-image" src="@tour.Imagen" alt="@T(tour.Nombre, tour.NombreEn)" /> }
+            <p class="tour-meta">@tour.Dias @L[tour.Dias == 1 ? "Day" : "Days"] · @LocalEnum.Show(tour.Tipo) · @LocalEnum.Show(tour.Dificultad)</p>
+            @if (tour.Destinos.Count > 0) { <p>@string.Join(" · ", tour.Destinos.Select(d => T(d.Destino.Nombre, d.Destino.NombreEn)))</p> }
+            <h2>@T("Itinerario", "Itinerary")</h2>
+            @foreach (var dia in tour.Itinerario)
+            {
+                <article class="panel itinerary">
+                    <p class="eyebrow">@L["Day"] @dia.Dia</p>
+                    <h3>@T(dia.Titulo, dia.TituloEn)</h3><p>@T(dia.Actividades, dia.ActividadesEn)</p>
+                    @if (!string.IsNullOrEmpty(T(dia.Alojamiento, dia.AlojamientoEn))) { <p>@T("Alojamiento", "Accommodation") · @T(dia.Alojamiento, dia.AlojamientoEn)</p> }
+                    @if (!string.IsNullOrEmpty(T(dia.Comidas, dia.ComidasEn))) { <p>@T("Comidas", "Meals") · @T(dia.Comidas, dia.ComidasEn)</p> }
+                </article>
+            }
+            <h2>@T("Antes de reservar", "Before booking")</h2>
+            <dl class="facts">
+                <dt>@T("Incluye", "Included")</dt><dd>@T(tour.Incluye, tour.IncluyeEn)</dd>
+                <dt>@T("No incluye", "Not included")</dt><dd>@T(tour.NoIncluye, tour.NoIncluyeEn)</dd>
+                <dt>@T("Requisitos", "Requirements")</dt><dd>@T(tour.Requisitos, tour.RequisitosEn)</dd>
+                <dt>@T("Cancelación", "Cancellation")</dt><dd>@(string.IsNullOrWhiteSpace(T(tour.Cancelacion, tour.CancelacionEn)) ? T("Consulta las condiciones con la agencia antes de pagar.", "Ask for the cancellation terms before paying.") : T(tour.Cancelacion,tour.CancelacionEn))</dd>
+            </dl>
+            @if (tour.Fotos.Count > 0)
+            {
+                <h2>@T("Galería", "Gallery")</h2>
+                <div class="card-grid">@foreach (var foto in tour.Fotos) { <figure><img class="gallery-image" src="@foto.Imagen" alt="@T(foto.Descripcion, foto.DescripcionEn)" loading="lazy" /><figcaption>@T(foto.Descripcion, foto.DescripcionEn)</figcaption></figure> }</div>
+            }
+        </article>
+        <aside class="panel departure-box">
+            <h2>@L["Salidas"]</h2><p class="muted">@T("Precio por pasajero", "Price per guest")</p>
+            @foreach (var salida in salidas)
+            {
+                <div class="departure">
+                    <strong>@salida.Inicio.ToString("d") @if(salida.Fin != salida.Inicio) { <span>– @salida.Fin.ToString("d")</span> }</strong>
+                    <span>@salida.Disponibles @T("cupos", "seats") · @Preferences.Money(SitePreferences.Currency == Moneda.BOB ? salida.PrecioBob ?? tour.PrecioBob : salida.PrecioUsd ?? tour.PrecioUsd, SitePreferences.Currency)</span>
+                    @if (salida.Disponibles > 0 && salida.Estado != EstadoSalida.Completa)
+                    { <a class="btn btn-small" href="/reservar/@salida.Id">@T("Reservar", "Book")</a> }
+                </div>
+            }
+            @if (salidas.Count == 0) { <p>@T("Pronto añadiremos fechas.", "Dates will be added soon.")</p> }
+        </aside>
+    </div>
+}
+@code {
+    [Parameter] public int Id { get; set; }
+    private Tour? tour;
+    private List<Salida> salidas = [];
+    protected override async Task OnParametersSetAsync()
+    {
+        tour = await Tours.Detalle(Id);
+        if (tour is null) Navigation.NotFound();
+        else salidas = await Departures.Salidas(Id);
+    }
+}

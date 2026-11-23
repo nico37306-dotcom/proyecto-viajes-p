@@ -1,0 +1,130 @@
+@page "/gestion/operaciones"
+@page "/gestion/operaciones/{Id:int}"
+@layout PanelLayout
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = Acceso.Operativo)]
+@inject IOperationsService Service
+@inject ICurrentUserService Current
+@inject NavigationManager Nav
+
+<PageTitle>Operaciones de viaje | Terra Andina</PageTitle>
+@if (Id is null)
+{
+    <h1>Salidas y logística</h1>
+    @if (salidas.Count == 0) { <p class="empty">No hay salidas en el calendario.</p> }
+    else
+    {
+        <div class="table-wrap"><table><thead><tr><th>Salida</th><th>Tour</th><th>Inicio</th><th>Estado</th><th>Ocupación</th></tr></thead><tbody>
+            @foreach (var s in salidas) { <tr><td><a class="text-link" href="/gestion/operaciones/@s.Id">#@s.Id</a></td><td>@s.Tour.Nombre @(s.Privada ? "· Privada" : "")</td><td>@s.Inicio.ToString("d")</td><td>@Nombre(s.Estado)</td><td>@s.Ocupados / @s.Cupos</td></tr> }
+        </tbody></table></div>
+    }
+}
+else if (detalle is { } d)
+{
+    <a class="text-link" href="/gestion/operaciones">Salidas y logística</a>
+    <h1>@d.Salida.Tour.Nombre</h1>
+    <p class="lead">Salida #@d.Salida.Id · @d.Salida.Inicio.ToString("d") – @d.Salida.Fin.ToString("d") · @Nombre(d.Salida.Estado)</p>
+    @if (mensaje is not null) { <p class="notice @(error ? "error" : "")" role="status">@mensaje</p> }
+    @if (!Cerrada(d.Salida.Estado))
+    {
+        <EditForm Model="input" OnSubmit="Guardar" class="panel form-stack itinerary">
+            <h2>Recursos operativos</h2>
+            <fieldset disabled="@busy" class="field-grid">
+                @if (d.Actor.Tiene(Acceso.Guias) || d.Actor.Tiene(Acceso.Operaciones))
+                {
+                    <label>Guía<InputSelect @bind-Value="input.Guia"><option value="">Sin asignar</option>
+                        @if (d.Salida.Guia is { Disponible: false } g) { <option value="@g.Id">@g.Nombre · No disponible</option> }
+                        @foreach (var guia in d.Guias) { <option value="@guia.Id">@guia.Nombre · @guia.Idiomas</option> }
+                    </InputSelect></label>
+                }
+                @if (d.Actor.Tiene(Acceso.Transporte) || d.Actor.Tiene(Acceso.Operaciones))
+                {
+                    <label>Vehículo<InputSelect @bind-Value="input.Vehiculo"><option value="">Sin asignar</option>
+                        @if (d.Salida.Vehiculo is { Disponible: false } v) { <option value="@v.Id">@v.Placa · No disponible</option> }
+                        @foreach (var vehiculo in d.Vehiculos) { <option value="@vehiculo.Id">@vehiculo.Placa · @vehiculo.Capacidad plazas</option> }
+                    </InputSelect></label>
+                }
+                @if (d.Actor.Tiene(Acceso.Operaciones)) { <label>Checklist operativo<InputTextArea rows="4" maxlength="2500" @bind-Value="input.Checklist" /></label> }
+            </fieldset>
+            <button class="btn" type="submit" disabled="@busy">Guardar recursos</button>
+        </EditForm>
+        @if (d.Actor.Tiene(Acceso.Operaciones))
+        {
+            <EditForm Model="input" OnSubmit="Actualizar" class="panel form-stack itinerary">
+                <h2>Estado y fechas</h2>
+                <fieldset class="field-grid" disabled="@busy">
+                    <label>Nuevo estado<InputSelect @bind-Value="input.Estado">
+                        <option value="@EstadoSalida.Confirmada">Confirmada</option><option value="@EstadoSalida.Completa">Completa</option>
+                        <option value="@EstadoSalida.Reprogramada">Reprogramada</option><option value="@EstadoSalida.Finalizada">Finalizada</option>
+                        <option value="@EstadoSalida.Cancelada">Cancelada</option><option value="@EstadoSalida.FuerzaMayor">Cancelada por fuerza mayor</option>
+                    </InputSelect></label>
+                    @if (input.Estado == EstadoSalida.Reprogramada)
+                    { <label>Inicio<InputDate @bind-Value="input.Inicio" /></label><label>Fin<InputDate @bind-Value="input.Fin" /></label> }
+                    @if (input.Estado is EstadoSalida.Cancelada or EstadoSalida.FuerzaMayor)
+                    { <label class="check"><InputCheckbox @bind-Value="input.Confirmar" />Confirmar cancelación de la salida y sus reservas</label> }
+                </fieldset>
+                <button class="btn" type="submit" disabled="@(busy || ((input.Estado is EstadoSalida.Cancelada or EstadoSalida.FuerzaMayor) && !input.Confirmar))">Actualizar salida</button>
+            </EditForm>
+        }
+    }
+    @if (d.Actor.Tiene(Acceso.Operaciones))
+    {
+        <section class="panel itinerary"><h2>Servicios coordinados</h2>
+            @foreach (var a in d.Asignaciones) { <p>@a.Fecha.ToString("d") · @a.Detalle · @Nombre(a.Estado)</p> }
+            <a class="text-link" href="/gestion/catalogo/asignaciones">Gestionar asignaciones</a>
+        </section>
+    }
+    <section class="panel"><h2>Pasajeros confirmados</h2>
+        @if (d.Reservas.Count == 0) { <p>@(d.Salida.Privada ? $"Viaje privado de {d.Salida.Cupos} personas." : "Aún no hay pasajeros confirmados.")</p> }
+        <ul>@foreach(var p in d.Reservas.SelectMany(x => x.Pasajeros)) { <li>@p.Nombre @if(d.Actor.Tiene(Acceso.Operaciones)) { <span> · @p.Documento · @p.Requerimientos</span> } else if(d.Actor.Tiene(Acceso.Guias)) { <span> · @p.Requerimientos</span> }</li> }</ul>
+    </section>
+}
+@code {
+    [Parameter] public int? Id { get; set; }
+    private List<Salida> salidas = [];
+    private Operacion? detalle;
+    private Entrada input = new();
+    private bool busy, error;
+    private string? mensaje;
+    protected override async Task OnParametersSetAsync()
+    {
+        var actor = await Current.Actual();
+        if (actor is null || !new[] { Acceso.Operaciones, Acceso.Guias, Acceso.Transporte }.Any(actor.Tiene)) { Nav.NavigateTo("/Account/AccessDenied"); return; }
+        mensaje = null;
+        await Cargar();
+    }
+    private async Task Cargar()
+    {
+        detalle = null;
+        if (Id is null) salidas = await Service.Listar();
+        else
+        {
+            detalle = await Service.Obtener(Id.Value);
+            if (detalle is null) { Nav.NotFound(); return; }
+            var s = detalle.Salida;
+            input = new() { Guia = s.GuiaId, Vehiculo = s.VehiculoId, Checklist = s.Checklist, Inicio = s.Inicio, Fin = s.Fin };
+        }
+    }
+    private static bool Cerrada(EstadoSalida estado) => estado is EstadoSalida.Cancelada or EstadoSalida.FuerzaMayor or EstadoSalida.Finalizada;
+    private Task Guardar() => Ejecutar(s => Service.Guardar(s.Id, s.Version, input.Guia, input.Vehiculo, input.Checklist));
+    private Task Actualizar() => Ejecutar(s => Service.Cambiar(s.Id, s.Version, input.Estado, input.Inicio, input.Fin));
+    private async Task Ejecutar(Func<Salida, Task> action)
+    {
+        if (busy || detalle is null) return;
+        busy = true;
+        error = false;
+        try { await action(detalle.Salida); await Cargar(); mensaje = "Salida actualizada."; }
+        catch (ReglaException ex) { mensaje = ex.Message; error = true; }
+        finally { busy = false; }
+    }
+    private sealed class Entrada
+    {
+        public int? Guia { get; set; }
+        public int? Vehiculo { get; set; }
+        public string Checklist { get; set; } = "";
+        public DateOnly Inicio { get; set; }
+        public DateOnly Fin { get; set; }
+        public EstadoSalida Estado { get; set; } = EstadoSalida.Confirmada;
+        public bool Confirmar { get; set; }
+    }
+}

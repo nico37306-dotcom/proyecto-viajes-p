@@ -1,0 +1,30 @@
+@page "/contacto"
+@inject CatalogService Catalog
+<PageTitle>@L["Contacto"] | Terra Andina</PageTitle>
+<section class="intro"><div class="wrap"><h1>@L["Contacto"]</h1><p>@T("Cuéntanos qué necesitas para preparar tu viaje.", "Tell us what you need to plan your trip.")</p></div></section>
+<section class="wrap section">
+    @if (enviado) { <p class="notice" role="status">@T("Recibimos tu mensaje.", "We received your message.")</p> }
+    else
+    {
+        <EditForm class="panel form-stack reading" Model="Input" method="post" FormName="contacto" OnValidSubmit="Enviar">
+            <DataAnnotationsValidator /><ValidationSummary />
+            <label>@T("Nombre", "Name")<InputText @bind-Value="Input!.Nombre" /></label>
+            <label>@T("Correo", "Email")<InputText type="email" @bind-Value="Input!.Correo" /></label>
+            <label>@T("Mensaje", "Message")<InputTextArea rows="5" @bind-Value="Input!.Mensaje" /></label>
+            <button class="btn" type="submit">@T("Enviar mensaje", "Send message")</button>
+        </EditForm>
+    }
+    @if (error is not null) { <p class="notice error" role="alert">@error</p> }
+</section>
+@code {
+    [SupplyParameterFromQuery] public string? Asunto { get; set; }
+    [SupplyParameterFromForm] private MensajeContacto? Input { get; set; }
+    private bool enviado;
+    private string? error;
+    protected override void OnParametersSet() => Input ??= new() { Mensaje = Asunto is { Length: > 0 and <= 140 } ? $"{T("Consulta sobre", "Question about")} {Asunto}" : "" };
+    private async Task Enviar()
+    {
+        try { await Catalog.Contacto(Input!); enviado = true; }
+        catch (ReglaException ex) { error = ex.Message; }
+    }
+}

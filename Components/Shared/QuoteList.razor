@@ -1,0 +1,17 @@
+@if (Solicitudes.Count == 0)
+{
+    <p class="empty">@T("No hay solicitudes para mostrar.", "There are no requests to show.")</p>
+}
+else
+{
+    <div class="table-wrap"><table><thead><tr><th>@T("Solicitud", "Request")</th><th>@T("Organización", "Organization")</th><th>@T("Fecha tentativa", "Preferred date")</th><th>@T("Personas", "People")</th><th>@T("Estado", "Status")</th></tr></thead><tbody>
+        @foreach (var s in Solicitudes)
+        {
+            <tr><td><a class="text-link" href="@($"{Ruta}/{s.Id}")">#@s.Id</a></td><td>@s.NombreOrganizacion</td><td>@s.FechaTentativa.ToString("d")</td><td>@s.Personas</td><td><span class="status">@LocalEnum.Show(s.Estado)</span></td></tr>
+        }
+    </tbody></table></div>
+}
+@code {
+    [Parameter, EditorRequired] public List<SolicitudCotizacion> Solicitudes { get; set; } = [];
+    [Parameter, EditorRequired] public string Ruta { get; set; } = "";
+}

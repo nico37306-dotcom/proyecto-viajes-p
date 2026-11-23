@@ -1,0 +1,49 @@
+@inject IQuotationService Organizations
+@inject Preferences SitePreferences
+
+@if (enviado)
+{
+    <p class="notice" role="status">@T("Recibimos la solicitud de cotización.", "We received your quote request.")</p>
+}
+else
+{
+    <EditForm Model="Input" FormName="solicitar-cotizacion" method="post" OnValidSubmit="Enviar" class="panel form-stack">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+        @if (!Portal)
+        {
+            <label>@T("Organización", "Organization")<InputText @bind-Value="Input!.NombreOrganizacion" /></label>
+            <label>@T("Correo de contacto", "Contact email")<InputText type="email" @bind-Value="Input!.Correo" /></label>
+        }
+        <div class="field-grid">
+            <label>@T("Fecha tentativa", "Preferred date")<InputDate @bind-Value="Input!.FechaTentativa" /></label>
+            <label>@T("Personas", "People")<InputNumber min="1" max="500" @bind-Value="Input!.Personas" /></label>
+            <label>@T("Presupuesto estimado", "Estimated budget")<InputNumber min="0" step="0.01" @bind-Value="Input!.Presupuesto" /></label>
+            <label>@T("Moneda", "Currency")<InputSelect @bind-Value="Input!.Moneda">@foreach (var moneda in Enum.GetValues<Moneda>()) { <option value="@moneda">@moneda</option> }</InputSelect></label>
+        </div>
+        <label>@T("Destinos y detalles del viaje", "Destinations and trip details")<InputTextArea rows="4" @bind-Value="Input!.Destinos" /></label>
+        <button class="btn" type="submit" disabled="@busy">@T("Solicitar cotización", "Request a quote")</button>
+    </EditForm>
+}
+@if (error is not null) { <p class="notice error" role="alert">@error</p> }
+
+@code {
+    [Parameter] public bool Portal { get; set; }
+    [Parameter] public string Nombre { get; set; } = "";
+    [Parameter] public string Correo { get; set; } = "";
+    [Parameter] public EventCallback Enviada { get; set; }
+    [SupplyParameterFromForm] private SolicitudCotizacion? Input { get; set; }
+    private bool enviado;
+    private bool busy;
+    private string? error;
+    protected override void OnInitialized() => Input ??= new() { NombreOrganizacion = Nombre, Correo = Correo, Moneda = SitePreferences.Currency };
+    private async Task Enviar()
+    {
+        if (busy) return;
+        busy = true;
+        error = null;
+        try { await Organizations.Solicitar(Input!, Portal); enviado = true; await Enviada.InvokeAsync(); }
+        catch (ReglaException ex) { error = ex.Message; }
+        finally { busy = false; }
+    }
+}

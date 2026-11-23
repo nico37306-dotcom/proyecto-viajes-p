@@ -1,0 +1,78 @@
+@page "/paquetes"
+@page "/promociones"
+@page "/guia"
+@page "/guia/{Slug}"
+@inject CatalogService Catalog
+@inject IPromotionService Promotions
+@inject NavigationManager Nav
+@inject Preferences SitePreferences
+<PageTitle>@Titulo | Terra Andina</PageTitle>
+<section class="intro"><div class="wrap"><h1>@Titulo</h1><p>@Bajada</p></div></section>
+<section class="wrap section">
+    @if (seccion == "paquetes")
+    {
+        <div class="card-grid">
+            @foreach (var p in paquetes)
+            {
+                <article class="tour-card"><div class="tour-image"><img src="@p.Imagen" alt="@T(p.Nombre,p.NombreEn)" loading="lazy" /></div><div class="tour-body">
+                    <h2>@T(p.Nombre,p.NombreEn)</h2><p>@T(p.Descripcion,p.DescripcionEn)</p>
+                    <ul>@foreach(var tour in p.Tours) { <li><a href="/tours/@tour.TourId">@T(tour.Tour.Nombre, tour.Tour.NombreEn)</a></li> }</ul>
+                    <p><strong>@Preferences.Money(SitePreferences.Currency == Moneda.BOB ? p.PrecioBob : p.PrecioUsd, SitePreferences.Currency)</strong></p>
+                    <a class="btn" href="/contacto?asunto=@Uri.EscapeDataString(T(p.Nombre,p.NombreEn))">@T("Consultar paquete", "Ask about this package")</a>
+                </div></article>
+            }
+        </div>
+        @if (paquetes.Count == 0) { <p class="empty">@T("Pronto publicaremos nuevos paquetes.", "New packages are coming soon.")</p> }
+    }
+    else if (seccion == "promociones")
+    {
+        @foreach (var promo in promos)
+        {
+            <article class="panel itinerary"><h2>@T(promo.Nombre, promo.NombreEn)</h2>
+                <p><strong>@(promo.Porcentaje ? $"{promo.Valor:G29}%" : Preferences.Money(promo.Valor, promo.Moneda))</strong> · @T("Válida hasta", "Valid until") @promo.Hasta.ToString("d")</p>
+                @if (promo.Codigo is not null) { <p>@T("Código", "Code") <code>@promo.Codigo</code></p> }
+                <a class="text-link" href="@(promo.TourId is int id ? $"/tours/{id}" : promo.PaqueteId.HasValue ? "/paquetes" : "/tours")">@L["Explorar"]</a></article>
+        }
+        @if (promos.Count == 0) { <p class="empty">@T("No hay promociones generales vigentes.", "There are no active public offers.")</p> }
+    }
+    else if (articulo is not null)
+    {
+        <article class="reading"><p class="preserve">@T(articulo.Cuerpo, articulo.CuerpoEn)</p><a class="text-link" href="/guia">@L["Guia"]</a></article>
+    }
+    else
+    {
+        @foreach (var a in contenido) { <article class="panel itinerary"><h2><a href="/guia/@a.Slug">@T(a.Titulo, a.TituloEn)</a></h2><p>@T(a.Cuerpo,a.CuerpoEn)</p><a class="text-link" href="/guia/@a.Slug">@T("Leer guía", "Read guide")</a></article> }
+        @if (contenido.Count == 0) { <p class="empty">@T("Pronto publicaremos nuevas guías.", "New guides are coming soon.")</p> }
+    }
+</section>
+@code {
+    [Parameter] public string? Slug { get; set; }
+    private string seccion = "";
+    private List<Paquete> paquetes = [];
+    private List<Promocion> promos = [];
+    private List<PaginaContenido> contenido = [];
+    private PaginaContenido? articulo;
+    private string Titulo => articulo is not null ? T(articulo.Titulo, articulo.TituloEn) : L[seccion == "paquetes" ? "Paquetes" : seccion == "promociones" ? "Promos" : "Guia"];
+    private string Bajada => seccion switch
+    {
+        "paquetes" => T("Combina rutas en un solo viaje.", "Combine routes in a single trip."),
+        "promociones" => T("Revisa fechas y códigos disponibles para tu próxima reserva.", "Check dates and promo codes for your next booking."),
+        _ => T("Información para preparar tu viaje por Bolivia.", "Plan your journey through Bolivia.")
+    };
+    protected override async Task OnParametersSetAsync()
+    {
+        seccion = Nav.ToBaseRelativePath(Nav.Uri).Split('/', '?')[0].ToLowerInvariant();
+        articulo = null;
+        if (seccion == "paquetes") paquetes = await Catalog.Paquetes();
+        else if (seccion == "promociones") promos = await Promotions.Promociones();
+        else
+        {
+            contenido = await Catalog.Contenido();
+            if (Slug is not null)
+            {
+                articulo = contenido.SingleOrDefault(x => x.Slug.Equals(Slug, StringComparison.OrdinalIgnoreCase));
+                if (articulo is null) Nav.NotFound();
+            }
+        }
+    }
+}

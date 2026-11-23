@@ -1,0 +1,35 @@
+@page "/mi-organizacion"
+@layout PanelLayout
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = Acceso.Representante)]
+@inject IOrganizationService Service
+@inject IConventionService Conventions
+<PageTitle>@T("Mi organización", "My organization") | Terra Andina</PageTitle>
+<h1>@(portal?.Organizacion.Nombre ?? T("Mi organización", "My organization"))</h1>
+@if (portal is { } p)
+{
+    <section class="panel itinerary">
+        <h2>@T("Convenios vigentes", "Active agreements")</h2>
+        @if (p.Convenios.Count == 0) { <p>@T("Tu organización aún no tiene convenios vigentes.", "Your organization does not have active agreements yet.")</p> }
+        @foreach (var convenio in p.Convenios)
+        {
+            <details><summary>@convenio.Nombre · @T("Hasta", "Until") @convenio.Hasta.ToString("d")</summary><p>@convenio.Condiciones</p>
+                @foreach(var tarifa in tarifas[convenio.Id]) { <p><strong>@tarifa.Nombre</strong> · @tarifa.Descuento.ToString("G29")% · @tarifa.Condiciones</p> }
+            </details>
+        }
+    </section>
+    <section><h2>@T("Cotizaciones y viajes grupales", "Quotes and group trips")</h2><QuoteList Solicitudes="p.Solicitudes" Ruta="/mi-organizacion/cotizaciones" /></section>
+    <section class="itinerary"><h2>@T("Nueva solicitud", "New request")</h2><QuoteForm Portal="true" Nombre="@p.Organizacion.Nombre" Correo="@p.Organizacion.Correo" Enviada="Cargar" /></section>
+}
+@code {
+    private PortalOrganizacion? portal;
+    private readonly Dictionary<int, List<TarifaVisible>> tarifas = [];
+    protected override Task OnInitializedAsync() => Cargar();
+    private async Task Cargar()
+    {
+        var nuevo = await Service.Portal();
+        tarifas.Clear();
+        foreach (var c in nuevo.Convenios) tarifas[c.Id] = await Conventions.Tarifas(c.Id);
+        portal = nuevo;
+    }
+}

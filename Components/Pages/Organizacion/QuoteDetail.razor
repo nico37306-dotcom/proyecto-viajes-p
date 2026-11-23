@@ -1,0 +1,123 @@
+@page "/mi-organizacion/cotizaciones/{Id:int}"
+@page "/gestion/cotizaciones/{Id:int}"
+@layout PanelLayout
+@rendermode InteractiveServer
+@attribute [Authorize]
+@inject IQuotationService Service
+@inject IOrganizationService Organizations
+@inject IGroupTripService GroupTrips
+@inject ITourService Tours
+@inject ICurrentUserService Current
+@inject NavigationManager Nav
+
+<PageTitle>@T("Cotización", "Quote") #@Id | Terra Andina</PageTitle>
+<h1>@T("Cotización", "Quote") #@Id</h1>
+@if (solicitud is { } s)
+{
+    <p class="lead">@s.NombreOrganizacion · <span class="status">@LocalEnum.Show(s.Estado)</span></p>
+    @if (mensaje is not null) { <p class="notice @(error ? "error" : "")" role="status">@mensaje</p> }
+    <section class="panel itinerary">
+        <h2>@T("Solicitud de viaje", "Trip request")</h2>
+        <p>@s.Personas @T("personas", "people") · @s.FechaTentativa.ToString("D")</p>
+        <p class="preserve">@s.Destinos</p>
+        @if (s.Presupuesto.HasValue) { <p>@T("Presupuesto", "Budget") · @Preferences.Money(s.Presupuesto.Value,s.Moneda)</p> }
+        @if (staff) { <p>@s.Correo</p> }
+    </section>
+    @if (s.Oferta is { } oferta && (staff || s.Estado is not (EstadoCotizacion.Recibida or EstadoCotizacion.EnElaboracion)))
+    {
+        <section class="panel itinerary"><h2>@T("Oferta de viaje", "Trip proposal")</h2><p class="preserve">@oferta.Detalle</p>
+            <p><strong>@Preferences.Money(oferta.Precio, oferta.Moneda)</strong> · @T("Válida hasta", "Valid until") @oferta.ValidaHasta.ToString("d")</p>
+            @if (!staff && s.Estado == EstadoCotizacion.Enviada && oferta.ValidaHasta >= Hoy)
+            { <div class="actions"><button class="btn" disabled="@busy" @onclick="() => Responder(true)">@T("Aceptar oferta", "Accept proposal")</button>
+                <button class="btn btn-outline" disabled="@busy" @onclick="() => Responder(false)">@T("Rechazar oferta", "Decline proposal")</button></div> }
+        </section>
+    }
+    @if (staff && s.Estado is EstadoCotizacion.Recibida or EstadoCotizacion.EnElaboracion or EstadoCotizacion.Enviada)
+    {
+        <EditForm Model="ofertaInput" class="panel form-stack itinerary" OnSubmit="Enviar">
+            <h2>Preparar oferta</h2>
+            <fieldset disabled="@busy">
+                @if (s.OrganizacionId is null)
+                { <label>Vincular organización<InputSelect @bind-Value="organizacion"><option value="">Selecciona una organización</option>@foreach(var o in organizaciones) { <option value="@o.Id">@o.Texto</option> }</InputSelect></label> }
+                <label>Detalle e itinerario<InputTextArea maxlength="2500" rows="5" @bind-Value="ofertaInput.Detalle" /></label>
+                <div class="field-grid">
+                    <label>Importe total<InputNumber min="0.01" step="0.01" @bind-Value="ofertaInput.Precio" /></label>
+                    <label>Moneda<InputSelect @bind-Value="ofertaInput.Moneda">@foreach(var moneda in Enum.GetValues<Moneda>()) { <option value="@moneda">@moneda</option> }</InputSelect></label>
+                    <label>Válida hasta<InputDate @bind-Value="ofertaInput.ValidaHasta" /></label>
+                </div>
+            </fieldset>
+            <div class="actions">
+                <button class="btn" type="submit" disabled="@busy">Enviar al portal</button>
+                <button class="btn btn-outline" type="button" disabled="@busy" @onclick="() => Preparar(EstadoCotizacion.EnElaboracion)">Marcar en elaboración</button>
+                <button class="btn btn-outline" type="button" disabled="@busy" @onclick="() => Preparar(EstadoCotizacion.Rechazada)">Rechazar solicitud</button>
+                @if (s.Estado == EstadoCotizacion.Enviada && s.Oferta?.ValidaHasta < Hoy)
+                { <button class="btn btn-outline" type="button" disabled="@busy" @onclick="() => Preparar(EstadoCotizacion.Vencida)">Marcar vencida</button> }
+            </div>
+        </EditForm>
+    }
+    @if (s.Viaje is { } viaje)
+    {
+        <section class="panel itinerary"><h2>@T("Viaje grupal", "Group trip")</h2>
+            <p>@T(viaje.Salida.Tour.Nombre, viaje.Salida.Tour.NombreEn) · @viaje.Salida.Inicio.ToString("d") – @viaje.Salida.Fin.ToString("d") · @LocalEnum.Show(viaje.Salida.Estado)</p>
+        </section>
+    }
+    else if (staff && s.Estado == EstadoCotizacion.Aceptada)
+    {
+        <EditForm Model="conversion" class="panel form-stack" OnSubmit="Convertir">
+            <h2>Crear salida privada</h2>
+            <fieldset class="field-grid" disabled="@busy">
+                <label>Tour<InputSelect @bind-Value="conversion.Tour"><option value="0">Selecciona un tour</option>@foreach (var t in tours) { <option value="@t.Id">@t.Nombre</option> }</InputSelect></label>
+                <label>Fecha de salida<InputDate @bind-Value="conversion.Inicio" /></label>
+            </fieldset>
+            <button class="btn" type="submit" disabled="@busy">Crear viaje grupal</button>
+        </EditForm>
+    }
+}
+@code {
+    [Parameter] public int Id { get; set; }
+    private bool staff, busy, error;
+    private SolicitudCotizacion? solicitud;
+    private Cotizacion ofertaInput = new();
+    private int? organizacion;
+    private List<Opcion> organizaciones = [];
+    private List<Tour> tours = [];
+    private Conversion conversion = new();
+    private string? mensaje;
+    protected override async Task OnParametersSetAsync()
+    {
+        staff = Nav.ToBaseRelativePath(Nav.Uri).StartsWith("gestion/", StringComparison.OrdinalIgnoreCase);
+        var actor = await Current.Actual();
+        if (actor?.Tiene(staff ? Acceso.Alianzas : Acceso.Representante) != true) { Nav.NavigateTo("/Account/AccessDenied"); return; }
+        mensaje = null;
+        await Cargar();
+    }
+    private async Task Cargar()
+    {
+        solicitud = await Service.Obtener(Id, staff);
+        if (solicitud is null) { Nav.NotFound(); return; }
+        ofertaInput = solicitud.Oferta ?? new() { Moneda = solicitud.Moneda };
+        organizacion = solicitud.OrganizacionId;
+        conversion = new() { Inicio = solicitud.FechaTentativa < Hoy ? Hoy : solicitud.FechaTentativa };
+        if (staff && organizacion is null) organizaciones = await Organizations.Organizaciones();
+        if (staff && solicitud.Estado == EstadoCotizacion.Aceptada && solicitud.Viaje is null) tours = await Tours.Buscar(new());
+    }
+    private Task Enviar() => Preparar(EstadoCotizacion.Enviada);
+    private Task Preparar(EstadoCotizacion estado) => Ejecutar(s => Service.Preparar(Id, s.Version, organizacion, estado, ofertaInput), "Solicitud actualizada.");
+    private Task Responder(bool aceptar) => Ejecutar(s => Service.Responder(Id, s.Version, aceptar), T("Respuesta registrada.", "Your response was saved."));
+    private Task Convertir() => Ejecutar(s => GroupTrips.Convertir(Id, s.Version, conversion.Tour, conversion.Inicio), "Viaje grupal creado.");
+    private async Task Ejecutar(Func<SolicitudCotizacion, Task> accion, string ok)
+    {
+        if (busy || solicitud is null) return;
+        busy = true;
+        error = false;
+        try { await accion(solicitud); await Cargar(); mensaje = ok; }
+        catch (ReglaException ex) { error = true; mensaje = ex.Message; }
+        catch (UnauthorizedAccessException) { Nav.NavigateTo("/Account/AccessDenied"); }
+        finally { busy = false; }
+    }
+    private sealed class Conversion
+    {
+        public int Tour { get; set; }
+        public DateOnly Inicio { get; set; }
+    }
+}

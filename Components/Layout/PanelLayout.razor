@@ -1,0 +1,40 @@
+@inherits LayoutComponentBase
+@inject ICurrentUserService Current
+@inject NavigationManager Nav
+<div class="dashboard">
+    <aside class="sidebar">
+        <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span><span>Terra<span class="brand-accent"> Andina</span><small>BOLIVIA</small></span></a>
+        <nav aria-label="@T("Panel", "Dashboard")">
+            <NavLink href="/panel" Match="NavLinkMatch.All">@T("Inicio del panel", "Dashboard home")</NavLink>
+            @if (actor?.Tiene(Acceso.Viajero) == true)
+            {
+                <NavLink href="/mis-reservas">@T("Mis reservas", "My bookings")</NavLink>
+                @if (actor.Tiene(Acceso.Representante)) { <NavLink href="/mi-organizacion">@T("Mi organización", "My organization")</NavLink> }
+                else { <NavLink href="/mi-perfil">@T("Mi perfil", "My profile")</NavLink> }
+            }
+            @if (actor?.Tiene(Acceso.Operativo) == true)
+            {
+                @if (actor.Tiene(Acceso.Ventas)) { <NavLink href="/gestion/reservas">Ventas y reservas</NavLink> }
+                @if (actor.Tiene(Acceso.Contabilidad)) { <NavLink href="/gestion/pagos">Contabilidad y pagos</NavLink> }
+                @if (actor.Tiene(Acceso.Operaciones) || actor.Tiene(Acceso.Guias) || actor.Tiene(Acceso.Transporte)) { <NavLink href="/gestion/operaciones">Operaciones de viaje</NavLink> }
+                @if (actor.Tiene(Acceso.Alianzas)) { <NavLink href="/gestion/cotizaciones">Cotizaciones grupales</NavLink> }
+                @if (actor.EsAdmin) { <NavLink href="/gestion/usuarios">Usuarios y roles</NavLink> }
+            }
+            <NavLink href="/Account/Manage">@T("Seguridad de la cuenta", "Account security")</NavLink>
+        </nav>
+    </aside>
+    <div class="dashboard-body">
+        <header class="dashboard-top">
+            <a class="text-link" href="/tours">@T("Volver al catálogo", "Back to catalog")</a>
+            <form action="/Account/Logout" method="post" data-enhance="false">
+                <AntiforgeryToken /><input type="hidden" name="ReturnUrl" value="" />
+                <button type="submit" class="btn btn-outline btn-small">@T("Cerrar sesión", "Sign out")</button>
+            </form>
+        </header>
+        <main class="workspace">@Body</main>
+    </div>
+</div>
+@code {
+    private Actor? actor;
+    protected override async Task OnInitializedAsync() => actor = await Current.Actual();
+}
